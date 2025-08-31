@@ -1,4 +1,4 @@
-package com.rivers.core.DTO;
+package com.rivers.core.page;
 
 import lombok.Data;
 
