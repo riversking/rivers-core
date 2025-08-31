@@ -1,4 +1,4 @@
-package com.rivers.core.VO;
+package com.rivers.core.vo;
 
 import lombok.Data;
 
