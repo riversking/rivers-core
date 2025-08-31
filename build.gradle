@@ -1,0 +1,119 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id "com.vanniktech.maven.publish" version "0.30.0"
+    id 'maven-publish'
+    id 'signing'
+}
+
+import com.vanniktech.maven.publish.SonatypeHost
+
+group = 'io.github.riversking'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+[compileJava, compileTestJava, javadoc]*.options*.encoding = 'UTF-8'
+
+repositories {
+    maven { url 'https://maven.aliyun.com/repository/public/' }
+    mavenLocal()
+    mavenCentral()
+}
+
+ext {
+    set('springCloudVersion', "2025.0.0")
+}
+
+dependencies {
+    implementation 'org.springframework:spring-web'
+    implementation 'org.springframework.cloud:spring-cloud-bus'
+    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
+    implementation 'com.google.protobuf:protobuf-java:4.29.3'
+    implementation 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
+    implementation 'com.google.protobuf:protobuf-java-util:4.29.3'
+    implementation 'com.google.guava:guava:33.4.0-jre'
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+    implementation 'org.apache.commons:commons-collections4:4.4'
+    implementation 'commons-codec:commons-codec:1.12'
+    implementation 'commons-io:commons-io:2.14.0'
+    implementation 'com.alibaba:fastjson:1.2.83'
+    implementation 'org.hashids:hashids:1.0.3'
+    compileOnly 'org.projectlombok:lombok:1.18.36'
+    testImplementation 'junit:junit:4.13.1'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+
+//防止乱码
+tasks.withType(Javadoc).configureEach {
+    options.version = true
+    options.author = true
+    options.encoding = "UTF-8"
+    options.charSet = "UTF-8"  //解决中文乱码
+}
+
+
+mavenPublishing {
+    // 配置坐标,参数一要和命名空间一致，参二为项目名(GroupId),参三为版本号 "1.0.0"
+    coordinates("io.github.riversking", "rivers-core", "1.0.0")
+    // 配置 pom 文件信息
+    pom {
+        // 项目名
+        name = "rivers-core"
+        // 项目描述
+        description = "timer核心"
+        // 项目主页
+        url = "https://github.com/riversking"
+        //开源许可
+        licenses {
+            license {
+                name = "LGPL-3.0 license"
+                url = "https://www.gnu.org/licenses/lgpl-3.0.html"
+                distribution = "https://www.gnu.org/licenses/lgpl-3.0.html"
+            }
+        }
+        //开发者信息
+        developers {
+            developer {
+                name = "riversking"
+                url = "https://github.com/riversking"
+                email = "kingjames-6236@hotmail.com"
+            }
+        }
+        //照着仓库地址填写
+        scm {
+            connection = "scm:git:git:github.com/riversking/riversking.github.io.gi"
+            developerConnection = "scm:git:ssh:github.com/riversking/riversking.github.io.git"
+            url = "https://github.com/riversking/riversking.github.io.git"
+        }
+    }
+    // 发布到 Sonatype, 参数为 sonatype host,还可以是 SonatypeHost.DEFAULT,SonatypeHost.S0
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, false)
+    //进行签名
+    signAllPublications()
+}
+

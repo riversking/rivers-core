@@ -1,0 +1,2 @@
+com.rivers.core.config.ProtobufHttpMessageConverter
+com.rivers.core.config.FilterIgnorePropertiesConfig
