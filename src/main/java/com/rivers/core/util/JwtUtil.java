@@ -16,7 +16,7 @@ public class JwtUtil {
         throw new IllegalStateException("Utility class");
     }
 
-    public static String createJwt(LoginUser loginUser) {
+    public static String createJwt(LoginUser loginUser, String key) {
         // 获取私钥和证书
         SignatureAlgorithm signatureAlgorithm = Jwts.SIG.RS256;
         KeyPair keyPair = signatureAlgorithm.keyPair().build();
@@ -24,6 +24,7 @@ public class JwtUtil {
         chaim.put("loginUser", loginUser);
         // 构建JWT
         return Jwts.builder()
+                .id(key)
                 .subject("subject")
                 .issuer("issuer")
                 .audience().add("audience")

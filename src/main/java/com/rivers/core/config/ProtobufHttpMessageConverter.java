@@ -21,24 +21,24 @@ import org.springframework.util.FileCopyUtils;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<Message> {
 
 
-    public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
-
     private static final MediaType PROTOBUF;
     private static final ConcurrentHashMap<Class<?>, Method> METHOD_CACHE;
 
     static {
-        PROTOBUF = new MediaType("application", "x-protobuf", DEFAULT_CHARSET);
+        PROTOBUF = new MediaType("application", "x-protobuf", StandardCharsets.UTF_8);
         METHOD_CACHE = new ConcurrentHashMap<>();
     }
 
@@ -52,6 +52,7 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
     }
 
     @Override
+    @NonNull
     protected MediaType getDefaultContentType(@NonNull Message message) {
         return PROTOBUF;
     }
@@ -60,10 +61,15 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
     @NonNull
     protected Message readInternal(@NonNull Class<? extends Message> clazz, HttpInputMessage inputMessage) {
         MediaType contentType = inputMessage.getHeaders().getContentType();
+        if (Objects.isNull(contentType)) {
+            contentType = PROTOBUF;
+        }
         Charset charset = contentType.getCharset();
-        try (InputStreamReader reader = new InputStreamReader(inputMessage.getBody(), charset)){
+        if (Objects.isNull(charset)) {
+            charset = StandardCharsets.UTF_8;
+        }
+        try (InputStreamReader reader = new InputStreamReader(inputMessage.getBody(), charset)) {
             Message.Builder ex = getMessageBuilder(clazz);
-
             if (MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
                 JsonFormat.parser()
                         .ignoringUnknownFields()
@@ -78,7 +84,8 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
     }
 
     @Override
-    protected boolean canWrite(@NonNull MediaType mediaType) {
+    @NonNull
+    protected boolean canWrite(MediaType mediaType) {
         return super.canWrite(mediaType);
     }
 
@@ -86,7 +93,13 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
     protected void writeInternal(@NonNull Message message, HttpOutputMessage outputMessage)
             throws IOException, HttpMessageNotWritableException {
         MediaType contentType = outputMessage.getHeaders().getContentType();
+        if (Objects.isNull(contentType)) {
+            contentType = PROTOBUF;
+        }
         Charset charset = contentType.getCharset();
+        if (Objects.isNull(charset)) {
+            charset = StandardCharsets.UTF_8;
+        }
         OutputStreamWriter outputStreamWriter;
         if (MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
             outputStreamWriter = new OutputStreamWriter(outputMessage.getBody(), charset);
@@ -102,13 +115,14 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
         }
     }
 
-    private static Message.Builder getMessageBuilder(Class<? extends Message> clazz) throws Exception {
-        Method method = METHOD_CACHE.get(clazz);
+    private static Message.Builder getMessageBuilder(Class<? extends Message> clazz)
+            throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        Method method = METHOD_CACHE.computeIfAbsent(clazz, k -> null);
         if (method == null) {
             method = clazz.getMethod("newBuilder");
             METHOD_CACHE.put(clazz, method);
         }
-        return (Message.Builder) method.invoke(clazz, new Object[0]);
+        return (Message.Builder) method.invoke(clazz, (Object[]) new String[0]);
     }
 
     /*在response中需要保留的字段名*/
@@ -123,19 +137,13 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
      */
     private static String formatJsonString(String input) {
         PropertyFilter filter =
-                (Object o, String name, Object value) -> {
-                    boolean usable = true;
-                    if (value instanceof JSONArray && ((JSONArray) value).isEmpty()) {
-                        usable = false;
-                    } else if (value instanceof Number
-                            && !usableFieldNames.contains(name)
-                            && ((Number) value).doubleValue() == NumberUtils.DOUBLE_ZERO) {
-                        usable = false;
-                    } else if (value instanceof String && StringUtils.isBlank((String) value)) {
-                        usable = false;
-                    }
-                    return usable;
-                };
+                (Object o, String name, Object value) ->
+                        switch (value) {
+                            case JSONArray jsonArray when jsonArray.isEmpty() -> false;
+                            case Number number when !usableFieldNames.contains(name)
+                                    && number.doubleValue() == NumberUtils.DOUBLE_ZERO -> false;
+                            default -> !(value instanceof String s) || !StringUtils.isBlank(s);
+                        };
         return JSON.toJSONString(JSON.parseObject(input), filter);
     }
 }
