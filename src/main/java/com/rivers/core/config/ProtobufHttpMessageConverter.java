@@ -3,6 +3,7 @@ package com.rivers.core.config;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.serializer.PropertyFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
@@ -16,6 +17,7 @@ import org.springframework.http.converter.AbstractHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.lang.NonNull;
+import org.springframework.util.Assert;
 import org.springframework.util.FileCopyUtils;
 
 import java.io.IOException;
@@ -85,19 +87,22 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
 
     @Override
     @NonNull
-    protected boolean canWrite(MediaType mediaType) {
+    protected boolean canWrite(@NonNull MediaType mediaType) {
         return super.canWrite(mediaType);
     }
 
     @Override
+    @NonNull
     protected void writeInternal(@NonNull Message message, HttpOutputMessage outputMessage)
-            throws IOException, HttpMessageNotWritableException {
+            throws IOException, HttpMessageNotWritableException, NullPointerException {
         MediaType contentType = outputMessage.getHeaders().getContentType();
-        if (Objects.isNull(contentType)) {
-            contentType = PROTOBUF;
+        if (contentType == null) {
+            contentType = this.getDefaultContentType(message);
+            Assert.state(contentType != null, "No content type");
         }
+
         Charset charset = contentType.getCharset();
-        if (Objects.isNull(charset)) {
+        if (charset == null) {
             charset = StandardCharsets.UTF_8;
         }
         OutputStreamWriter outputStreamWriter;
