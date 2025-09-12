@@ -3,7 +3,6 @@ package com.rivers.core.config;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.serializer.PropertyFilter;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
@@ -17,7 +16,6 @@ import org.springframework.http.converter.AbstractHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.lang.NonNull;
-import org.springframework.util.Assert;
 import org.springframework.util.FileCopyUtils;
 
 import java.io.IOException;
@@ -27,14 +25,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<Message> {
-
 
     private static final MediaType PROTOBUF;
     private static final ConcurrentHashMap<Class<?>, Method> METHOD_CACHE;
@@ -86,36 +82,32 @@ public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<M
     }
 
     @Override
-    @NonNull
-    protected boolean canWrite(@NonNull MediaType mediaType) {
+    public boolean canWrite(MediaType mediaType) {
         return super.canWrite(mediaType);
     }
 
     @Override
-    @NonNull
-    protected void writeInternal(@NonNull Message message, HttpOutputMessage outputMessage)
+    public void writeInternal(@NonNull Message message, HttpOutputMessage outputMessage)
             throws IOException, HttpMessageNotWritableException, NullPointerException {
         MediaType contentType = outputMessage.getHeaders().getContentType();
         if (contentType == null) {
             contentType = this.getDefaultContentType(message);
-            Assert.state(contentType != null, "No content type");
         }
-
         Charset charset = contentType.getCharset();
         if (charset == null) {
             charset = StandardCharsets.UTF_8;
         }
         OutputStreamWriter outputStreamWriter;
-        if (MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
+        if (MediaType.APPLICATION_JSON.isCompatibleWith(contentType)
+                || PROTOBUF.isCompatibleWith(contentType)) {
             outputStreamWriter = new OutputStreamWriter(outputMessage.getBody(), charset);
             String result = JsonFormat.printer()
-                    .includingDefaultValueFields(Collections.emptySet())
                     .preservingProtoFieldNames()
                     .omittingInsignificantWhitespace()
                     .print(message);
             outputStreamWriter.write(formatJsonString(result));
             outputStreamWriter.flush();
-        } else if (PROTOBUF.isCompatibleWith(contentType)) {
+        } else {
             FileCopyUtils.copy(message.toByteArray(), outputMessage.getBody());
         }
     }

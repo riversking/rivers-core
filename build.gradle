@@ -40,17 +40,17 @@ dependencies {
     api 'com.google.guava:guava:33.4.0-jre'
     api 'org.apache.commons:commons-lang3:3.18.0'
     api 'org.apache.commons:commons-collections4:4.4'
-    api 'commons-codec:commons-codec:1.12'
+    api 'commons-codec:commons-codec:1.19.0'
     api 'commons-io:commons-io:2.14.0'
     api 'com.alibaba:fastjson:2.0.58'
     api 'cn.hutool:hutool-all:5.8.40'
     api 'org.projectlombok:lombok'
+    api 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
     implementation 'io.jsonwebtoken:jjwt:0.13.0'
     implementation 'org.hashids:hashids:1.0.3'
     implementation 'org.springframework:spring-web'
     implementation 'org.springframework.cloud:spring-cloud-bus'
-    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
     implementation 'com.google.protobuf:protobuf-java:4.29.3'
     implementation 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
     implementation 'com.google.protobuf:protobuf-java-util:4.29.3'
@@ -79,7 +79,7 @@ tasks.withType(Javadoc).configureEach {
 
 mavenPublishing {
     // 配置坐标,参数一要和命名空间一致，参二为项目名(GroupId),参三为版本号 "1.0.0"
-    coordinates("io.github.riversking", "rivers-core", "1.0.3")
+    coordinates("io.github.riversking", "rivers-core", "1.0.4")
     // 配置 pom 文件信息
     pom {
         // 项目名

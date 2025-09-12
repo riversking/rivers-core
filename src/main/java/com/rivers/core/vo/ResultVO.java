@@ -41,4 +41,8 @@ public class ResultVO<T> {
     public static <T> ResultVO<T> ok(Integer code, String message, T data) {
         return new ResultVO<>(code, message, data);
     }
+
+    public static <T> ResultVO<T> fail(Integer code, String message) {
+        return new ResultVO<>(code, message);
+    }
 }
