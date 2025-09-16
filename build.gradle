@@ -4,6 +4,7 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
     id "com.vanniktech.maven.publish" version "0.30.0"
     id 'maven-publish'
+    id 'java-gradle-plugin'
     id 'signing'
 }
 
@@ -15,6 +16,21 @@ version = '1.0.3'
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+
+jar {
+    into("META-INF/maven/$project.group/$project.name") {
+        from { generatePomFileForPluginMavenPublication }
+        rename ".*", "pom.xml"
+    }
+    enabled = true
+    bootJar.enabled = false
+    archiveClassifier = ''
+    manifest {
+        attributes('Implementation-Title': 'Gradle',
+                'Implementation-Version': archiveVersion)
     }
 }
 
@@ -34,6 +50,8 @@ repositories {
 
 ext {
     set('springCloudVersion', "2025.0.0")
+    set('springCloudNacosVersion', "2025.0.0.0-preview")
+    set('mybatisPlusVersion', "3.5.14")
 }
 
 dependencies {
@@ -46,14 +64,20 @@ dependencies {
     api 'cn.hutool:hutool-all:5.8.40'
     api 'org.projectlombok:lombok'
     api 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
-    implementation 'io.jsonwebtoken:jjwt:0.13.0'
-    implementation 'org.hashids:hashids:1.0.3'
-    implementation 'org.springframework:spring-web'
-    implementation 'org.springframework.cloud:spring-cloud-bus'
-    implementation 'com.google.protobuf:protobuf-java:4.29.3'
-    implementation 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
-    implementation 'com.google.protobuf:protobuf-java-util:4.29.3'
+    api platform('com.alibaba.cloud:spring-cloud-alibaba-dependencies:2025.0.0.0-preview')
+    api 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config'
+    api 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
+    api platform('com.baomidou:mybatis-plus-bom:3.5.14')
+    api 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    api 'com.baomidou:mybatis-plus-jsqlparser'
+    api 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
+    api 'io.jsonwebtoken:jjwt:0.13.0'
+    api 'org.hashids:hashids:1.0.3'
+    api 'org.springframework:spring-web'
+    api 'org.springframework.cloud:spring-cloud-bus'
+    api 'com.google.protobuf:protobuf-java:4.29.3'
+    api 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
+    api 'com.google.protobuf:protobuf-java-util:4.29.3'
     annotationProcessor 'org.projectlombok:lombok'
 }
 
@@ -79,7 +103,7 @@ tasks.withType(Javadoc).configureEach {
 
 mavenPublishing {
     // 配置坐标,参数一要和命名空间一致，参二为项目名(GroupId),参三为版本号 "1.0.0"
-    coordinates("io.github.riversking", "rivers-core", "1.0.4")
+    coordinates("io.github.riversking", "rivers-core", "1.0.9.7")
     // 配置 pom 文件信息
     pom {
         // 项目名
@@ -106,7 +130,7 @@ mavenPublishing {
         }
         //照着仓库地址填写
         scm {
-            connection = "scm:git:git:github.com/riversking/riversking.github.io.gi"
+            connection = "scm:git:git:github.com/riversking/riversking.github.io.git"
             developerConnection = "scm:git:ssh:github.com/riversking/riversking.github.io.git"
             url = "https://github.com/riversking/riversking.github.io.git"
         }
@@ -116,4 +140,3 @@ mavenPublishing {
     //进行签名
     signAllPublications()
 }
-
