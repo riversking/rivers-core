@@ -21,7 +21,7 @@ public class ProtobufJacksonConfig {
         ObjectMapper mapper = builder.createXmlMapper(false).build();
         SimpleModule protobufModule = new SimpleModule("ProtobufModule");
         protobufModule.addSerializer(GeneratedMessage.class, new ProtobufSerializer<>());
-        protobufModule.addDeserializer(GeneratedMessage.class, new ProtobufDeserializer());
+        protobufModule.addDeserializer(GeneratedMessage.class, new ProtobufDeserializer<>());
         mapper.registerModule(protobufModule);
         mapper.configure(com.fasterxml.jackson.databind.SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         return mapper;
