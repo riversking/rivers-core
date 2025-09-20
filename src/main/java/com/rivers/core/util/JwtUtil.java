@@ -1,15 +1,19 @@
 package com.rivers.core.util;
 
 import com.google.common.collect.Maps;
+import com.rivers.core.constant.JwtConstant;
 import com.rivers.core.entity.LoginUser;
+import com.rivers.core.exception.BusinessException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.FileInputStream;
 import java.io.InputStream;
-import java.security.*;
+import java.security.KeyPair;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,12 +30,12 @@ public class JwtUtil {
         signatureAlgorithm = Jwts.SIG.RS256;
         try (InputStream is = JwtUtil.class.getClassLoader().getResourceAsStream("key/rivers.jks")) {
             KeyStore keyStore = KeyStore.getInstance("JKS");
-            keyStore.load(is, "King9128@918".toCharArray());
-            PrivateKey riversPrivate = (PrivateKey) keyStore.getKey("siyao", "King9128@918".toCharArray());
+            keyStore.load(is, JwtConstant.JWT_SECRET.toCharArray());
+            PrivateKey riversPrivate = (PrivateKey) keyStore.getKey("siyao", JwtConstant.JWT_SECRET.toCharArray());
             PublicKey riversPub = keyStore.getCertificate("siyao").getPublicKey();
             keyPair = new KeyPair(riversPub, riversPrivate);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new BusinessException(e);
         }
     }
 
@@ -54,13 +58,5 @@ public class JwtUtil {
     public static Claims parseJwt(String token) {
         PublicKey publicKey = keyPair.getPublic();
         return Jwts.parser().verifyWith(publicKey).build().parseSignedClaims(token).getPayload();
-    }
-
-    public static void main(String[] args) {
-        LoginUser loginUser = new LoginUser();
-        loginUser.setAccountNo("a");
-        String jwt = createJwt(loginUser, UUID.randomUUID().toString());
-        System.out.println(jwt);
-        System.out.println(parseJwt(jwt));
     }
 }
