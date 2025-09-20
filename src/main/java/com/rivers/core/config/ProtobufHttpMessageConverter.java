@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Configuration
+@Deprecated
 public class ProtobufHttpMessageConverter extends AbstractHttpMessageConverter<Message> {
 
     private static final MediaType PROTOBUF;
