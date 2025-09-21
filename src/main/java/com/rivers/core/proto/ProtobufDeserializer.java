@@ -1,4 +1,4 @@
-package com.rivers.core.protobuf;
+package com.rivers.core.proto;
 
 
 import com.fasterxml.jackson.core.JsonParser;
@@ -10,8 +10,8 @@ import com.google.protobuf.GeneratedMessage;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.Set;
 
 // 这是一个通用的Protobuf反序列化器
 public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeserializer<T> implements ContextualDeserializer {
@@ -33,8 +33,8 @@ public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeseria
     }
 
     @Override
-    public JsonDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property) {
-        JavaType type = ctxt.getContextualType();
+    public JsonDeserializer<?> createContextual(DeserializationContext dc, BeanProperty property) {
+        JavaType type = dc.getContextualType();
         if (type == null) {
             return this; // 返回原型实例本身（虽然不太可能发生）
         }
@@ -44,7 +44,6 @@ public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeseria
             // 让Jackson使用默认的反序列化器
             return null;
         }
-
         // 使用带参构造器创建一个新的、专门针对 rawClass 的反序列化器实例
         // @SuppressWarnings("unchecked")
         return new ProtobufDeserializer<>((Class<T>) rawClass);
@@ -52,7 +51,7 @@ public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeseria
 
 
     @Override
-    public T deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public T deserialize(JsonParser p, DeserializationContext deserializationContext) throws IOException {
         JsonNode node = p.getCodec().readTree(p);
         // 通过反射调用消息类的 newBuilder() 方法来获取Builder实例
         try {
@@ -62,9 +61,9 @@ public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeseria
             Descriptors.Descriptor descriptor = builder.getDescriptorForType();
 
             // 遍历JSON中的所有字段
-            Iterator<Entry<String, JsonNode>> fields = node.fields();
-            while (fields.hasNext()) {
-                Entry<String, JsonNode> field = fields.next();
+            Set<Entry<String, JsonNode>> fields = node.properties();
+            while (fields.iterator().hasNext()) {
+                Entry<String, JsonNode> field = fields.iterator().next();
                 String fieldName = field.getKey();
                 JsonNode value = field.getValue();
 
