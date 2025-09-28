@@ -10,6 +10,7 @@ import org.springframework.util.ReflectionUtils;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,7 +43,13 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
             // 4. 检查方法是否是标准的getter (getXxx, hasXxx)
             if (methodName.startsWith("get") && method.getParameterCount() == 0
                     && !methodName.equals("getClass")) {
-                String fieldName = uncapitalize(methodName.substring(3));
+                String fieldName;
+                if (methodName.endsWith("List")) {
+                    // 处理 repeated 字段的 List 访问方法
+                    fieldName = uncapitalize(methodName.substring(3, methodName.length() - 4));
+                } else {
+                    fieldName = uncapitalize(methodName.substring(3));
+                }
                 // 5. 核心判断：如果字段名在.proto定义的列表中，则进行序列化
                 if (protoFieldNames.contains(fieldName)) {
                     makeFieldName(message, gen, provider, method, fieldName);
@@ -52,33 +59,6 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
                 String fieldName = uncapitalize(methodName.substring(3));
                 if (protoFieldNames.contains(fieldName)) {
                     handleHasMethod(message, gen, provider, method, fieldName);
-                }
-            } else if (methodName.endsWith("Count") && method.getParameterCount() == 0) {
-                // 处理 repeated 字段的计数方法
-                String fieldName = uncapitalize(methodName.substring(3, methodName.length() - 5));
-                if (protoFieldNames.contains(fieldName)) {
-                    try {
-                        ReflectionUtils.makeAccessible(method);
-                        int count = (Integer) method.invoke(message);
-                        if (count > 0) {
-                            gen.writeFieldName(fieldName);
-                            gen.writeStartArray();
-                            // 获取对应的索引访问方法
-                            Method getter = message.getClass().getMethod(
-                                    "get" + fieldName.substring(0, 1).toUpperCase()
-                                            + fieldName.substring(1),
-                                    int.class
-                            );
-                            ReflectionUtils.makeAccessible(getter);
-                            for (int i = 0; i < count; i++) {
-                                Object value = getter.invoke(message, i);
-                                provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
-                            }
-                            gen.writeEndArray();
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to serialize repeated field: {}", fieldName, e);
-                    }
                 }
             }
         }
@@ -113,8 +93,15 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
         try {
             ReflectionUtils.makeAccessible(method);
             Object value = method.invoke(message);
-            if (!isDefaultValue(value)) {
-                gen.writeFieldName(fieldName);
+            gen.writeFieldName(fieldName);
+            if (value instanceof List<?> list) {
+                // 处理 List 类型（repeated 字段）
+                gen.writeStartArray();
+                for (Object item : list) {
+                    provider.findValueSerializer(item.getClass()).serialize(item, gen, provider);
+                }
+                gen.writeEndArray();
+            } else if (!isDefaultValue(value)) {
                 provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
             }
         } catch (Exception e) {
