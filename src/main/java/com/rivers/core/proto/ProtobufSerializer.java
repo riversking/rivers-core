@@ -51,16 +51,43 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
                 // 处理 hasXxx() 方法，通常用于 optional 字段或基本类型
                 String fieldName = uncapitalize(methodName.substring(3));
                 if (protoFieldNames.contains(fieldName)) {
-                    handleHasMetho(message, gen, provider, method, fieldName);
+                    handleHasMethod(message, gen, provider, method, fieldName);
+                }
+            } else if (methodName.endsWith("Count") && method.getParameterCount() == 0) {
+                // 处理 repeated 字段的计数方法
+                String fieldName = uncapitalize(methodName.substring(3, methodName.length() - 5));
+                if (protoFieldNames.contains(fieldName)) {
+                    try {
+                        ReflectionUtils.makeAccessible(method);
+                        int count = (Integer) method.invoke(message);
+                        if (count > 0) {
+                            gen.writeFieldName(fieldName);
+                            gen.writeStartArray();
+                            // 获取对应的索引访问方法
+                            Method getter = message.getClass().getMethod(
+                                    "get" + fieldName.substring(0, 1).toUpperCase()
+                                            + fieldName.substring(1),
+                                    int.class
+                            );
+                            ReflectionUtils.makeAccessible(getter);
+                            for (int i = 0; i < count; i++) {
+                                Object value = getter.invoke(message, i);
+                                provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
+                            }
+                            gen.writeEndArray();
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to serialize repeated field: {}", fieldName, e);
+                    }
                 }
             }
         }
         gen.writeEndObject();
     }
 
-    private static <T extends GeneratedMessage> void handleHasMetho(T message, JsonGenerator gen,
-                                                                    SerializerProvider provider, Method method,
-                                                                    String fieldName) {
+    private static <T extends GeneratedMessage> void handleHasMethod(T message, JsonGenerator gen,
+                                                                     SerializerProvider provider, Method method,
+                                                                     String fieldName) {
         try {
             ReflectionUtils.makeAccessible(method);
             // 如果 hasXxx() 返回 true，我们才去获取并序列化 getXxx() 的值
