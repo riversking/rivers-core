@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.protobuf.GeneratedMessage;
 import com.rivers.core.proto.ProtobufDeserializer;
-import com.rivers.core.proto.ProtobufSerializer;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;

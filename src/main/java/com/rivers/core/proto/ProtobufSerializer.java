@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.GeneratedMessage;
+import com.rivers.core.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.ReflectionUtils;
 
@@ -17,112 +18,133 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializer<T> {
 
-
     /**
-     * ProtobufSerializer类的构造函数
-     * 这是一个私有构造函数，采用单例模式设计，防止外部通过new关键字实例化该类
-     * 通常用于工具类或需要全局唯一实例的场景
+     * 默认构造函数，供 Jackson 框架通过反射实例化使用
      */
     public ProtobufSerializer() {
-        // 私有构造函数，防止实例化
     }
 
     @Override
     public void serialize(T message, JsonGenerator gen, SerializerProvider provider) throws IOException {
-        // 1. 获取消息的Descriptor，这是元数据的来源
         Descriptors.Descriptor descriptor = message.getDescriptorForType();
-        // 2. 从Descriptor中提取所有在.proto文件中定义的字段名，并存入一个Set以便快速查找
-        Set<String> protoFieldNames = descriptor.getFields()
-                .stream()
+        Set<String> protoFieldNames = descriptor.getFields().stream()
                 .map(Descriptors.FieldDescriptor::getName)
                 .collect(Collectors.toSet());
+
         gen.writeStartObject();
-        // 3. 遍历消息中的所有方法
+
         for (Method method : message.getClass().getMethods()) {
-            String methodName = method.getName();
-            // 4. 检查方法是否是标准的getter (getXxx, hasXxx)
-            if (methodName.startsWith("get") && method.getParameterCount() == 0
-                    && !methodName.equals("getClass")) {
-                String fieldName;
-                if (methodName.endsWith("List")) {
-                    // 处理 repeated 字段的 List 访问方法
-                    fieldName = uncapitalize(methodName.substring(3, methodName.length() - 4));
-                } else {
-                    fieldName = uncapitalize(methodName.substring(3));
-                }
-                // 5. 核心判断：如果字段名在.proto定义的列表中，则进行序列化
-                if (protoFieldNames.contains(fieldName)) {
-                    makeFieldName(message, gen, provider, method, fieldName);
-                }
-            } else if (methodName.startsWith("has") && method.getParameterCount() == 0) {
-                // 处理 hasXxx() 方法，通常用于 optional 字段或基本类型
-                String fieldName = uncapitalize(methodName.substring(3));
-                if (protoFieldNames.contains(fieldName)) {
-                    handleHasMethod(message, gen, provider, method, fieldName);
-                }
-            }
+            processMethod(message, gen, provider, method, protoFieldNames);
         }
+
         gen.writeEndObject();
     }
 
-    private static <T extends GeneratedMessage> void handleHasMethod(T message, JsonGenerator gen,
-                                                                     SerializerProvider provider, Method method,
-                                                                     String fieldName) {
-        try {
-            ReflectionUtils.makeAccessible(method);
-            // 如果 hasXxx() 返回 true，我们才去获取并序列化 getXxx() 的值
-            if (Boolean.TRUE.equals(method.invoke(message))) {
-                Method getter = ReflectionUtils.findMethod(message.getClass(),
-                        "get" + fieldName.substring(0, 1).toUpperCase()
-                                + fieldName.substring(1));
-                if (getter != null) {
-                    ReflectionUtils.makeAccessible(getter);
-                    Object value = getter.invoke(message);
-                    gen.writeFieldName(fieldName);
-                    provider.findValueSerializer(value.getClass())
-                            .serialize(value, gen, provider);
-                }
+    private void processMethod(T message, JsonGenerator gen, SerializerProvider provider,
+                               Method method, Set<String> protoFieldNames) throws IOException {
+        String methodName = method.getName();
+        int paramCount = method.getParameterCount();
+
+        // 其他方法不做处理
+        if (methodName.startsWith("get") && paramCount == 0 && !methodName.equals("getClass")) {
+            String fieldName = extractFieldName(methodName);
+            if (protoFieldNames.contains(fieldName)) {
+                processGetterMethod(message, gen, provider, method, fieldName);
             }
-        } catch (Exception e) {
-            log.error("Failed to serialize field {}'", fieldName, e);
+        } else if (methodName.startsWith("has") && paramCount == 0) {
+            var fieldName = uncapitalize(methodName.substring(3));
+            if (protoFieldNames.contains(fieldName)) {
+                processHasMethod(message, gen, provider, method, fieldName);
+            }
         }
     }
 
-    private void makeFieldName(T message, JsonGenerator gen, SerializerProvider provider,
-                               Method method, String fieldName) {
+    private void processGetterMethod(T message, JsonGenerator gen, SerializerProvider provider,
+                                     Method method, String fieldName) {
         try {
             ReflectionUtils.makeAccessible(method);
             Object value = method.invoke(message);
-            gen.writeFieldName(fieldName);
-            if (value instanceof List<?> list) {
-                // 处理 List 类型（repeated 字段）
-                gen.writeStartArray();
-                for (Object item : list) {
-                    provider.findValueSerializer(item.getClass()).serialize(item, gen, provider);
+            if (shouldSerializeValue(value)) {
+                gen.writeFieldName(fieldName);
+                switch (value) {
+                    case List<?> list -> serializeList(list, gen, provider);
+                    case null -> {
+                        // null 值已在 shouldSerializeValue 方法中过滤，此处不需要处理
+                    }
+                    default -> provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
                 }
-                gen.writeEndArray();
-            } else if (!isDefaultValue(value)) {
-                provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
             }
         } catch (Exception e) {
-            log.error("Failed to serialize field {}'", fieldName, e);
+            log.error("Failed to serialize field '{}'", fieldName, e);
+            throw new BusinessException(fieldName, e);
         }
     }
 
-    private boolean isDefaultValue(Object value) {
+    private void processHasMethod(T message, JsonGenerator gen, SerializerProvider provider,
+                                  Method method, String fieldName) throws IOException {
+        try {
+            ReflectionUtils.makeAccessible(method);
+            if (Boolean.TRUE.equals(method.invoke(message))) {
+                Method getter = ReflectionUtils.findMethod(message.getClass(),
+                        "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1));
+                if (getter != null) {
+                    ReflectionUtils.makeAccessible(getter);
+                    Object value = getter.invoke(message);
+
+                    if (shouldSerializeValue(value)) {
+                        gen.writeFieldName(fieldName);
+                        provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to serialize field '{}'", fieldName, e);
+            throw new BusinessException(fieldName, e);
+        }
+    }
+
+    private void serializeList(List<?> list, JsonGenerator gen, SerializerProvider provider) throws IOException {
+        gen.writeStartArray();
+        try {
+            list.stream()
+                    .filter(this::shouldSerializeValue)
+                    .forEach(item -> {
+                        try {
+                            provider.findValueSerializer(item.getClass()).serialize(item, gen, provider);
+                        } catch (IOException e) {
+                            log.error("Failed to serialize list item", e);
+                        }
+                    });
+        } finally {
+            gen.writeEndArray();
+        }
+    }
+
+    private boolean shouldSerializeValue(Object value) {
         return switch (value) {
-            case null -> true;
-            case String str when str.isEmpty() -> true;
-            case Number number when number.doubleValue() == 0.0 -> true;
-            case Boolean b when !b -> true;
-            default -> false;
+            case null -> false;
+            case String s when s.isEmpty() -> false;
+            case Number n when n.doubleValue() == 0.0 -> false;
+            case Boolean b when !b -> false;
+            default -> true;
         };
     }
 
-    private String uncapitalize(String str) {
-        if (str == null || str.isEmpty()) {
-            return str;
+    private String extractFieldName(String methodName) {
+        String list;
+        if (methodName instanceof String s && s.endsWith("List")) {
+            list = uncapitalize(s.substring(3, s.length() - 4));
+        } else {
+            list = uncapitalize(methodName.substring(3));
         }
-        return str.substring(0, 1).toLowerCase() + str.substring(1);
+        return list;
+    }
+
+    private String uncapitalize(String str) {
+        return switch (str) {
+            case "" -> str;
+            case null -> null;
+            default -> str.substring(0, 1).toLowerCase() + str.substring(1);
+        };
     }
 }

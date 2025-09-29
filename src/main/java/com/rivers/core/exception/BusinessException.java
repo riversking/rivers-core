@@ -7,10 +7,13 @@ public class BusinessException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public BusinessException(Throwable msg) {
-        super(msg);
+    public BusinessException(Throwable e) {
+        super(e);
     }
 
+    public BusinessException(String message, Throwable msg) {
+        super(message, msg);
+    }
 
 
 }
