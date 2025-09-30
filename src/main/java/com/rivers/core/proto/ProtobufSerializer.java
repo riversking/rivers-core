@@ -26,24 +26,21 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
 
     @Override
     public void serialize(T message, JsonGenerator gen, SerializerProvider provider) throws IOException {
-        Descriptors.Descriptor descriptor = message.getDescriptorForType();
-        Set<String> protoFieldNames = descriptor.getFields().stream()
+        var descriptor = message.getDescriptorForType();
+        var protoFieldNames = descriptor.getFields().stream()
                 .map(Descriptors.FieldDescriptor::getName)
                 .collect(Collectors.toSet());
-
         gen.writeStartObject();
-
-        for (Method method : message.getClass().getMethods()) {
+        for (var method : message.getClass().getMethods()) {
             processMethod(message, gen, provider, method, protoFieldNames);
         }
-
         gen.writeEndObject();
     }
 
     private void processMethod(T message, JsonGenerator gen, SerializerProvider provider,
                                Method method, Set<String> protoFieldNames) throws IOException {
-        String methodName = method.getName();
-        int paramCount = method.getParameterCount();
+        var methodName = method.getName();
+        var paramCount = method.getParameterCount();
 
         // 其他方法不做处理
         if (methodName.startsWith("get") && paramCount == 0 && !methodName.equals("getClass")) {
@@ -63,7 +60,7 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
                                      Method method, String fieldName) {
         try {
             ReflectionUtils.makeAccessible(method);
-            Object value = method.invoke(message);
+            var value = method.invoke(message);
             if (shouldSerializeValue(value)) {
                 gen.writeFieldName(fieldName);
                 switch (value) {
@@ -85,12 +82,11 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
         try {
             ReflectionUtils.makeAccessible(method);
             if (Boolean.TRUE.equals(method.invoke(message))) {
-                Method getter = ReflectionUtils.findMethod(message.getClass(),
+                var getter = ReflectionUtils.findMethod(message.getClass(),
                         "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1));
                 if (getter != null) {
                     ReflectionUtils.makeAccessible(getter);
-                    Object value = getter.invoke(message);
-
+                    var value = getter.invoke(message);
                     if (shouldSerializeValue(value)) {
                         gen.writeFieldName(fieldName);
                         provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
