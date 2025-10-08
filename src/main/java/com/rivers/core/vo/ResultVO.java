@@ -49,7 +49,6 @@ public class ResultVO<T extends Serializable> implements Serializable {
     }
 
 
-
     public static <T extends Serializable> ResultVO<T> ok(T data) {
         return new ResultVO<>(200, "操作成功", data);
     }
@@ -60,6 +59,10 @@ public class ResultVO<T extends Serializable> implements Serializable {
 
     public static <T extends Serializable> ResultVO<T> fail(Integer code, String message) {
         return new ResultVO<>(code, message);
+    }
+
+    public static <T extends Serializable> ResultVO<T> fail(String message) {
+        return new ResultVO<>(500, message);
     }
 
     public abstract static class EmptyType implements Serializable {
