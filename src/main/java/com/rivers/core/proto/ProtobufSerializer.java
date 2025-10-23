@@ -3,6 +3,7 @@ package com.rivers.core.proto;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import com.google.common.collect.Lists;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.GeneratedMessage;
 import com.rivers.core.exception.BusinessException;
@@ -17,6 +18,9 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializer<T> {
+
+    private static final List<String> usableFieldNames = Lists.newArrayList("total");
+
 
     /**
      * 默认构造函数，供 Jackson 框架通过反射实例化使用
@@ -61,7 +65,7 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
         try {
             ReflectionUtils.makeAccessible(method);
             var value = method.invoke(message);
-            if (shouldSerializeValue(value)) {
+            if (shouldSerializeValue(value) || usableFieldNames.contains(fieldName)) {
                 gen.writeFieldName(fieldName);
                 switch (value) {
                     case List<?> list -> serializeList(list, gen, provider);

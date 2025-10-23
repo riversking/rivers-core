@@ -4,17 +4,10 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Data;
 
-import java.io.Serial;
-import java.io.Serializable;
-
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({"code", "message", "data"})
-public class ResultVO<T extends Serializable> implements Serializable {
-
-
-    @Serial
-    private static final long serialVersionUID = 3278715392832902343L;
+public class ResultVO<T> {
 
     private Integer code;
 
@@ -39,34 +32,28 @@ public class ResultVO<T extends Serializable> implements Serializable {
         this.data = data;
     }
 
-    public static ResultVO<EmptyType> ok() {
+    public static <T> ResultVO<T> ok() {
         return new ResultVO<>(200, "操作成功");
     }
 
-
-    public static <T extends Serializable> ResultVO<T> ok(Integer code, String message) {
+    public static <T> ResultVO<T> ok(Integer code, String message) {
         return new ResultVO<>(code, message);
     }
 
 
-    public static <T extends Serializable> ResultVO<T> ok(T data) {
+    public static <T> ResultVO<T> ok(T data) {
         return new ResultVO<>(200, "操作成功", data);
     }
 
-    public static <T extends Serializable> ResultVO<T> ok(Integer code, String message, T data) {
+    public static <T> ResultVO<T> ok(Integer code, String message, T data) {
         return new ResultVO<>(code, message, data);
     }
 
-    public static <T extends Serializable> ResultVO<T> fail(Integer code, String message) {
+    public static <T> ResultVO<T> fail(Integer code, String message) {
         return new ResultVO<>(code, message);
     }
 
-    public static <T extends Serializable> ResultVO<T> fail(String message) {
+    public static <T> ResultVO<T> fail(String message) {
         return new ResultVO<>(500, message);
-    }
-
-    public abstract static class EmptyType implements Serializable {
-        @Serial
-        private static final long serialVersionUID = 1L;
     }
 }

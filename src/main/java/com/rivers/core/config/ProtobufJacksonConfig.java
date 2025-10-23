@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.util.JsonFormat;
 import com.rivers.core.proto.ProtobufDeserializer;
 import com.rivers.core.proto.ProtobufSerializer;
 import org.jetbrains.annotations.NotNull;
@@ -48,7 +49,10 @@ public class ProtobufJacksonConfig {
 
     @Bean
     public ProtobufJsonFormatHttpMessageConverter protobufJsonFormatHttpMessageConverter() {
-        return new ProtobufJsonFormatHttpMessageConverter();
+        // 使用自定义的 JsonFormat.Parser
+        JsonFormat.Parser parser = JsonFormat.parser().ignoringUnknownFields();
+        JsonFormat.Printer printer = JsonFormat.printer();
+        return new ProtobufJsonFormatHttpMessageConverter(parser, printer);
     }
 
 }
