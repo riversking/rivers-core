@@ -6,7 +6,7 @@ public interface TreeNode<K, T extends TreeNode<K, T>> {
 
     K getId();
 
-    K getPid();
+    K getParentId();
 
     List<T> getChildren();
 

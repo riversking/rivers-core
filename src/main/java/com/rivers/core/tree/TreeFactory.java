@@ -1,5 +1,9 @@
 package com.rivers.core.tree;
 
+import com.google.common.collect.Lists;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
+
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,14 +14,12 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
      * 使用虚拟线程处理大规模数据构建
      */
     public List<T> buildTree(List<T> nodeList) {
-        if (nodeList.isEmpty()) {
+        if (CollectionUtils.isEmpty(nodeList)) {
             return new ArrayList<>();
         }
         // 使用 LinkedHashMap 保持插入顺序
-        Map<K, T> nodeMap = new LinkedHashMap<>(nodeList.size());
-        for (T node : nodeList) {
-            nodeMap.put(node.getId(), node);
-        }
+        Map<K, T> nodeMap = LinkedHashMap.newLinkedHashMap(nodeList.size());
+        nodeList.forEach(node -> nodeMap.put(node.getId(), node));
         return buildTreeIteratively(nodeMap);
     }
 
@@ -26,30 +28,29 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
      * 利用 Java 21 的模式匹配和流式处理优化
      */
     public List<T> buildTreeIteratively(Map<K, T> nodeMap) {
-        if (nodeMap.isEmpty()) {
-            return new ArrayList<>();
+        if (MapUtils.isEmpty(nodeMap)) {
+            return Lists.newArrayList();
         }
         Set<K> processedNodes = ConcurrentHashMap.newKeySet();
         boolean hasChanges;
         do {
             hasChanges = false;
             // 使用并行流处理大规模数据
-            List<K> toRemove = nodeMap.values().parallelStream()
+            List<K> toRemove = nodeMap.values()
+                    .parallelStream()
                     .filter(node -> !processedNodes.contains(node.getId()))
                     .map(node -> {
-                        K parentId = node.getPid();
-                        return switch (parentId) {
-                            case null -> null; // 根节点无需处理
-                            default -> {
-                                T parentNode = nodeMap.get(parentId);
-                                if (parentNode != null && !parentNode.getId().equals(node.getId())) {
-                                    parentNode.addChild(node);
-                                    processedNodes.add(node.getId());
-                                    yield node.getId();
-                                }
-                                yield null;
-                            }
-                        };
+                        K parentId = node.getParentId();
+                        if (parentId == null) {
+                            return null;
+                        }
+                        T parentNode = nodeMap.get(parentId);
+                        if (parentNode != null && !parentNode.getId().equals(node.getId())) {
+                            parentNode.addChild(node);
+                            processedNodes.add(node.getId());
+                            return node.getId();
+                        }
+                        return null;
                     })
                     .filter(Objects::nonNull)
                     .toList();
@@ -58,7 +59,7 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
                 hasChanges = true;
             }
         } while (hasChanges);
-        return new ArrayList<>(nodeMap.values());
+        return Lists.newArrayList(nodeMap.values());
     }
 
     /**
