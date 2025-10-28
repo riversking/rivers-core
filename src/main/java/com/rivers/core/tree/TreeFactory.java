@@ -61,7 +61,6 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         if (parentId == null) {
             return null;
         }
-
         T parentNode = nodeMap.get(parentId);
         if (parentNode != null && !parentNode.getId().equals(node.getId())) {
             parentNode.addChild(node);
@@ -106,4 +105,61 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         List<T> result = buildTree(nodeList);
         return Collections.unmodifiableSequencedCollection(result);
     }
+
+    public Map<K, T> buildParentMap(List<T> nodeList) {
+        Map<K, T> parentMap = new HashMap<>();
+        Map<K, T> nodeMap = new HashMap<>();
+        // 构建节点映射
+        for (T node : nodeList) {
+            nodeMap.put(node.getId(), node);
+        }
+        // 建立父子关系
+        for (T node : nodeList) {
+            K parentId = node.getParentId();
+            if (parentId != null) {
+                T parent = nodeMap.get(parentId);
+                if (parent != null) {
+                    parentMap.put(node.getId(), parent);
+                }
+            }
+        }
+        return parentMap;
+    }
+
+    // 获取从指定子节点到根节点的所有父节点路径
+    public List<T> findPathToRoot(K childId, Map<K, T> parentMap) {
+        List<T> path = Lists.newArrayList();
+        T current = parentMap.get(childId);
+        // 向上追溯到根节点
+        while (current != null) {
+            path.addFirst(current); // 插入到开头保持从根到子的顺序
+            current = parentMap.get(current.getId());
+        }
+        return path;
+    }
+
+    // 构建从根节点到指定子节点的完整树形路径
+    public List<T> buildPathTree(K childId, List<T> nodeList) {
+        // 构建父子关系映射
+        Map<K, T> parentMap = buildParentMap(nodeList);
+        // 获取路径上的所有节点
+        List<T> pathNodes = findPathToRoot(childId, parentMap);
+        // 如果找不到路径，返回空列表
+        if (pathNodes.isEmpty()) {
+            return Lists.newArrayList();
+        }
+        // 构建树形结构
+        List<T> tree = Lists.newArrayList();
+        T rootNode = pathNodes.getFirst();
+        tree.add(rootNode);
+        // 重建父子关系
+        for (int i = 1; i < pathNodes.size(); i++) {
+            T parent = pathNodes.get(i - 1);
+            T child = pathNodes.get(i);
+            parent.getChildren().clear(); // 清空原有子节点
+            parent.addChild(child);
+        }
+        return tree;
+    }
+
 }
