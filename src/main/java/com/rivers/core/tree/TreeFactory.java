@@ -106,9 +106,9 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         return Collections.unmodifiableSequencedCollection(result);
     }
 
-    public Map<K, T> buildParentMap(List<T> nodeList) {
-        Map<K, T> parentMap = new HashMap<>();
-        Map<K, T> nodeMap = new HashMap<>();
+    public SequencedMap<K, T> buildParentMap(List<T> nodeList) {
+        SequencedMap<K, T> parentMap = new LinkedHashMap<>();
+        SequencedMap<K, T> nodeMap = new LinkedHashMap<>();
         // 构建节点映射
         for (T node : nodeList) {
             nodeMap.put(node.getId(), node);
@@ -126,40 +126,46 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         return parentMap;
     }
 
+
     // 获取从指定子节点到根节点的所有父节点路径
-    public List<T> findPathToRoot(K childId, Map<K, T> parentMap) {
-        List<T> path = Lists.newArrayList();
+// 获取从指定子节点到根节点的所有父节点路径
+    public SequencedCollection<T> findPathToRoot(K childId, SequencedMap<K, T> parentMap) {
+        List<T> path = new ArrayList<>();
         T current = parentMap.get(childId);
         // 向上追溯到根节点
         while (current != null) {
             path.addFirst(current); // 插入到开头保持从根到子的顺序
             current = parentMap.get(current.getId());
         }
-        return path;
+        return Collections.unmodifiableSequencedCollection(path);
     }
 
+
     // 构建从根节点到指定子节点的完整树形路径
-    public List<T> buildPathTree(K childId, List<T> nodeList) {
+    public SequencedCollection<T> buildPathTree(K childId, List<T> nodeList) {
         // 构建父子关系映射
-        Map<K, T> parentMap = buildParentMap(nodeList);
+        SequencedMap<K, T> parentMap = buildParentMap(nodeList);
         // 获取路径上的所有节点
-        List<T> pathNodes = findPathToRoot(childId, parentMap);
+        SequencedCollection<T> pathNodes = findPathToRoot(childId, parentMap);
         // 如果找不到路径，返回空列表
         if (pathNodes.isEmpty()) {
-            return Lists.newArrayList();
+            return Collections.unmodifiableSequencedCollection(new ArrayList<>());
         }
         // 构建树形结构
-        List<T> tree = Lists.newArrayList();
-        T rootNode = pathNodes.getFirst();
+        List<T> tree = new ArrayList<>();
+        T rootNode = pathNodes instanceof List<?> pathList ? (T) pathList.get(0) : pathNodes.iterator().next();
         tree.add(rootNode);
         // 重建父子关系
-        for (int i = 1; i < pathNodes.size(); i++) {
-            T parent = pathNodes.get(i - 1);
-            T child = pathNodes.get(i);
+        List<T> pathList = new ArrayList<>(pathNodes);
+        for (int i = 1; i < pathList.size(); i++) {
+            T parent = pathList.get(i - 1);
+            T child = pathList.get(i);
             parent.getChildren().clear(); // 清空原有子节点
             parent.addChild(child);
         }
-        return tree;
+        return Collections.unmodifiableSequencedCollection(tree);
     }
+
+
 
 }
