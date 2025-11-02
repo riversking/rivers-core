@@ -153,7 +153,7 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         }
         // 构建树形结构
         List<T> tree = new ArrayList<>();
-        T rootNode = pathNodes instanceof List<?> pathList ? (T) pathList.get(0) : pathNodes.iterator().next();
+        T rootNode = pathNodes instanceof List<?> pathList ? (T) pathList.getFirst() : pathNodes.getFirst();
         tree.add(rootNode);
         // 重建父子关系
         List<T> pathList = new ArrayList<>(pathNodes);
