@@ -7,6 +7,7 @@ public class DynamicClient {
 
     private final DynamicFeignClientFactory<DynamicFeign> dynamicFeignClientFactory;
 
+
     public DynamicClient(DynamicFeignClientFactory<DynamicFeign> dynamicFeignClientFactory) {
         this.dynamicFeignClientFactory = dynamicFeignClientFactory;
     }

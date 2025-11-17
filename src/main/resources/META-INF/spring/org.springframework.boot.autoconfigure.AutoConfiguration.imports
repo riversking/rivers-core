@@ -1,2 +1,4 @@
 com.rivers.core.config.ProtobufJacksonConfig
 com.rivers.core.config.FilterIgnorePropertiesConfig
+com.rivers.core.feign.DynamicClient
+com.rivers.core.feign.DynamicFeignClientFactory
