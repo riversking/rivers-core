@@ -19,8 +19,8 @@ public class DynamicServiceClient {
 
     private final DiscoveryClient discoveryClient;
 
-    public DynamicServiceClient(WebClient webClient, DiscoveryClient discoveryClient) {
-        this.webClient = webClient;
+    public DynamicServiceClient(WebClient.Builder builder, DiscoveryClient discoveryClient) {
+        this.webClient = builder.build();
         this.discoveryClient = discoveryClient;
     }
 
