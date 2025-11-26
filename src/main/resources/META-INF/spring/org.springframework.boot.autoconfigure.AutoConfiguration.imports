@@ -6,3 +6,6 @@ com.rivers.core.feign.DynamicClient
 com.rivers.core.feign.DynamicFeignClientFactory
 com.rivers.core.provider.ApplicationContextProvider
 com.rivers.core.util.SpringUtil
+com.rivers.core.config.RetryConfiguration
+com.rivers.core.task.BusinessTaskHandler
+com.rivers.core.task.BatchController
