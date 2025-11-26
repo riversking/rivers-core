@@ -1,0 +1,30 @@
+package com.rivers.core.task;
+
+import com.rivers.core.entity.JobParamReq;
+import com.rivers.core.vo.ResultVO;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Component;
+
+@Component
+@Slf4j
+public abstract class BusinessTaskHandler implements BatchTaskHandler {
+
+    protected abstract ResultVO<Void> doExecute(JobParamReq jobParamReq);
+
+    @Override
+    @Retryable(
+            retryFor = {Exception.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public ResultVO<Void> execute(JobParamReq jobParamReq) {
+        // 前置处理
+        log.info("开始执行批处理任务: {}, 类型: {}", jobParamReq.getServerName(), jobParamReq.getParams());
+        // 执行业务逻辑
+        ResultVO<Void> result = doExecute(jobParamReq);
+        log.info("批处理任务完成");
+        return result;
+    }
+}

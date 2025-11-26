@@ -4,3 +4,5 @@ com.rivers.core.config.WebClientConfig
 com.rivers.core.client.DynamicServiceClient
 com.rivers.core.feign.DynamicClient
 com.rivers.core.feign.DynamicFeignClientFactory
+com.rivers.core.provider.ApplicationContextProvider
+com.rivers.core.util.SpringUtil

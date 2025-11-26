@@ -80,6 +80,8 @@ dependencies {
     api 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
     api 'com.google.protobuf:protobuf-java-util:4.29.5'
     api 'org.springframework.boot:spring-boot-starter-webflux'
+    api 'org.springframework.retry:spring-retry'
+    api 'org.springframework:spring-aspects'
     annotationProcessor 'org.projectlombok:lombok'
 }
 
