@@ -13,7 +13,7 @@ public interface BatchTaskHandler {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    ResultVO<Void> execute(JobParamReq jobParamReq);
+    void execute(JobParamReq jobParamReq);
 
     @Recover
     default ResultVO<Void> recover(Exception e, JobParamReq jobParamReq) {

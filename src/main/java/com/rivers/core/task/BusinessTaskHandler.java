@@ -10,13 +10,12 @@ public abstract class BusinessTaskHandler implements BatchTaskHandler {
     protected abstract ResultVO<Void> doExecute(JobParamReq jobParamReq);
 
     @Override
-    public ResultVO<Void> execute(JobParamReq jobParamReq) {
+    public void execute(JobParamReq jobParamReq) {
         // 前置处理
-        log.info("开始执行批处理任务: {}, 类型: {}", jobParamReq.getServerName(), jobParamReq.getParams());
+        log.info("开始执行批处理任务: {}, 类型: {}", jobParamReq.getTaskName(), jobParamReq.getParams());
         // 执行业务逻辑
-        ResultVO<Void> result = doExecute(jobParamReq);
+        doExecute(jobParamReq);
         log.info("批处理任务完成");
-        return result;
     }
 
     @Override

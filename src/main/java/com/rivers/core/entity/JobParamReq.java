@@ -13,7 +13,7 @@ public class JobParamReq implements Serializable {
     @Serial
     private static final long serialVersionUID = 7284949678274488419L;
 
-    private String serverName;
+    private String taskName;
 
     private Map<String, Object> params = Maps.newHashMap();
 }
