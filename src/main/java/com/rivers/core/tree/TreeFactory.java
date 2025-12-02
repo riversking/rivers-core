@@ -128,7 +128,7 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
 
 
     // 获取从指定子节点到根节点的所有父节点路径
-// 获取从指定子节点到根节点的所有父节点路径
+    // 获取从指定子节点到根节点的所有父节点路径
     public SequencedCollection<T> findPathToRoot(K childId, SequencedMap<K, T> parentMap) {
         List<T> path = new ArrayList<>();
         T current = parentMap.get(childId);

@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public abstract class BusinessTaskHandler implements BatchTaskHandler {
 
-    protected abstract ResultVO<Void> doExecute(JobParamReq jobParamReq);
+    protected abstract void doExecute(JobParamReq jobParamReq);
 
     @Override
     public void execute(JobParamReq jobParamReq) {

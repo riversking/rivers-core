@@ -1,9 +1,12 @@
 package com.rivers.core.config;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer;
 import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.UnknownFieldSet;
 import com.google.protobuf.util.JsonFormat;
 import com.rivers.core.proto.ProtobufDeserializer;
 import com.rivers.core.proto.ProtobufSerializer;
@@ -38,7 +41,10 @@ public class ProtobufJacksonConfig {
                 protobufModule.addDeserializer(GeneratedMessage.class, new ProtobufDeserializer<>());
                 objectMapper.registerModule(protobufModule);
                 // 配置特性
-                objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+                objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,false)
+                        .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
+                        .configure(SerializationFeature.FAIL_ON_SELF_REFERENCES, false)
+                        .addMixIn(UnknownFieldSet.class, StdScalarSerializer.class);
                 // 3. 返回修改后的Bean
                 return objectMapper;
             }
