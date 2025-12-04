@@ -13,7 +13,7 @@ public class LoginUser implements Serializable {
     @Serial
     private static final long serialVersionUID = -6660462189662856019L;
 
-    private String accountNo;
+    private String userId;
 
     private String username;
 
