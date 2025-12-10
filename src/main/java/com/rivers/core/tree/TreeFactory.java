@@ -1,30 +1,25 @@
 package com.rivers.core.tree;
 
-import com.google.common.collect.Lists;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.MapUtils;
 
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
 
     /**
      * 使用虚拟线程处理大规模数据构建
      */
-    public List<T> buildTree(List<T> nodeList) {
+    public List<T> buildTree(List<T> nodeList, K parentId) {
         if (CollectionUtils.isEmpty(nodeList)) {
-            return Lists.newArrayList();
+            return Collections.emptyList();
         }
-        // 参数验证
         validateNodeList(nodeList);
-        // 根据数据量决定处理策略
         Map<K, T> nodeMap = createNodeMap(nodeList);
-        return buildTreeIteratively(nodeMap);
+        return buildTreeBFS(nodeMap, parentId);
     }
 
     private void validateNodeList(List<T> nodeList) {
@@ -40,7 +35,7 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
     }
 
     private Map<K, T> createNodeMap(List<T> nodeList) {
-        // 对于大规模数据，考虑使用虚拟线程
+        // Java 21 虚拟线程：5000+ 数据自动用虚拟线程
         if (nodeList.size() > 5000) {
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 return CompletableFuture.supplyAsync(() -> {
@@ -56,53 +51,44 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         }
     }
 
-    private K tryAttachNode(T node, Map<K, T> nodeMap, Set<K> processedNodes) {
-        K parentId = node.getParentId();
-        if (parentId == null) {
-            return null;
+    // ✨ 核心优化：Java 21 的 groupingByConcurrent！
+    private List<T> buildTreeBFS(Map<K, T> nodeMap, K parentId) {
+        if (nodeMap.isEmpty()) return Collections.emptyList();
+
+        // 构建父节点映射（用 Java 21 并行收集器）
+        Map<K, List<T>> parentMap = buildParentMap(nodeMap);
+        Queue<T> queue = new LinkedList<>();
+        // 找出所有根节点（parentId == null）
+        for (T node : nodeMap.values()) {
+            if (node.getParentId() == null || Objects.equals(node.getParentId(), parentId)) {
+                queue.offer(node);
+            }
         }
-        T parentNode = nodeMap.get(parentId);
-        if (parentNode != null && !parentNode.getId().equals(node.getId())) {
-            parentNode.addChild(node);
-            processedNodes.add(node.getId());
-            return node.getId();
+        // BFS：按层级构建树（O(N) 时间！）
+        while (!queue.isEmpty()) {
+            T parent = queue.poll();
+            List<T> children = parentMap.getOrDefault(parent.getId(), Collections.emptyList());
+            for (T child : children) {
+                parent.addChild(child); // 添加子节点
+                queue.offer(child);     // 子节点入队（处理它们的子节点）
+                nodeMap.remove(child.getId()); // 从Map移除，避免重复
+            }
         }
-        return null;
+        return new ArrayList<>(nodeMap.values()); // 返回根节点列表
     }
 
-    /**
-     * 使用迭代方式构建树形结构，避免递归栈溢出
-     */
-    public List<T> buildTreeIteratively(Map<K, T> nodeMap) {
-        if (MapUtils.isEmpty(nodeMap)) {
-            return Lists.newArrayList();
-        }
-        Set<K> processedNodes = ConcurrentHashMap.newKeySet();
-        boolean hasChanges;
-        do {
-            hasChanges = false;
-            // 根据数据量决定是否使用并行流
-            Stream<T> toRemove = nodeMap.size() > 1000 ?
-                    nodeMap.values().parallelStream() :
-                    nodeMap.values().stream();
-            List<K> removedIds = toRemove
-                    .filter(node -> !processedNodes.contains(node.getId()))
-                    .map(node -> tryAttachNode(node, nodeMap, processedNodes))
-                    .filter(Objects::nonNull)
-                    .toList();
-            if (!removedIds.isEmpty()) {
-                removedIds.forEach(nodeMap::remove);
-                hasChanges = true;
-            }
-        } while (hasChanges);
-        return Lists.newArrayList(nodeMap.values());
+    private Map<K, List<T>> buildParentMap(Map<K, T> nodeMap) {
+        return nodeMap.values().parallelStream()
+                .collect(Collectors.groupingByConcurrent(
+                        TreeNode::getParentId, Collectors.toList()
+                ));
     }
 
     /**
      * 使用 SequencedCollection (Java 21 新特性) 返回有序结果
      */
-    public SequencedCollection<T> buildTreeOrdered(List<T> nodeList) {
-        List<T> result = buildTree(nodeList);
+    public SequencedCollection<T> buildTreeOrdered(List<T> nodeList, K parentId) {
+        List<T> result = buildTree(nodeList, parentId);
         return Collections.unmodifiableSequencedCollection(result);
     }
 
@@ -165,7 +151,6 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         }
         return Collections.unmodifiableSequencedCollection(tree);
     }
-
 
 
 }
