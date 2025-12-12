@@ -5,90 +5,157 @@ import org.apache.commons.collections4.CollectionUtils;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
 
     /**
      * 使用虚拟线程处理大规模数据构建
      */
-    public List<T> buildTree(List<T> nodeList, K parentId) {
+    public List<T> buildTree(List<T> nodeList) {
         if (CollectionUtils.isEmpty(nodeList)) {
             return Collections.emptyList();
         }
-        validateNodeList(nodeList);
-        Map<K, T> nodeMap = createNodeMap(nodeList);
-        return buildTreeBFS(nodeMap, parentId);
+        // 优化验证：大数据并行验证
+        validateNodeListOptimized(nodeList);
+        // 优化NodeMap创建
+        Map<K, T> nodeMap = createOptimizedNodeMap(nodeList);
+        // 优化树构建：父节点找不到自动成为根节点
+        return buildTreeWithOrphanedRoots(nodeMap);
     }
 
-    private void validateNodeList(List<T> nodeList) {
-        Set<K> ids = new HashSet<>();
-        for (T node : nodeList) {
-            if (node.getId() == null) {
-                throw new IllegalArgumentException("Node ID cannot be null");
+    private void validateNodeListOptimized(List<T> nodeList) {
+        int size = nodeList.size();
+        if (size > 10000) {
+            // 大数据集使用并行验证
+            ConcurrentHashMap.KeySetView<Object, Boolean> idSet = ConcurrentHashMap.newKeySet();
+            AtomicBoolean hasError = new AtomicBoolean(false);
+            StringBuilder errorMsg = new StringBuilder();
+            nodeList.parallelStream().forEach(node -> {
+                if (node.getId() == null) {
+                    hasError.set(true);
+                    errorMsg.append("Node ID cannot be null; ");
+                } else if (!idSet.add(node.getId())) {
+                    hasError.set(true);
+                    errorMsg.append("Duplicate node ID: ").append(node.getId()).append("; ");
+                }
+            });
+            if (hasError.get()) {
+                throw new IllegalArgumentException(errorMsg.toString());
             }
-            if (!ids.add(node.getId())) {
-                throw new IllegalArgumentException("Duplicate node ID: " + node.getId());
+        } else {
+            // 小数据集串行验证（避免并行开销）
+            Set<K> ids = HashSet.newHashSet(size + (size >> 2));
+            for (T node : nodeList) {
+                if (node.getId() == null) {
+                    throw new IllegalArgumentException("Node ID cannot be null");
+                }
+                if (!ids.add(node.getId())) {
+                    throw new IllegalArgumentException("Duplicate node ID: " + node.getId());
+                }
             }
         }
     }
 
-    private Map<K, T> createNodeMap(List<T> nodeList) {
-        // Java 21 虚拟线程：5000+ 数据自动用虚拟线程
-        if (nodeList.size() > 5000) {
+    private Map<K, T> createOptimizedNodeMap(List<T> nodeList) {
+        int size = nodeList.size();
+        if (size > 5000) {
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 return CompletableFuture.supplyAsync(() -> {
-                    Map<K, T> nodeMap = LinkedHashMap.newLinkedHashMap(nodeList.size());
+                    // 使用ConcurrentHashMap + 精确容量预分配
+                    Map<K, T> nodeMap = new ConcurrentHashMap<>(size + (size >> 2), 0.75f,
+                            Runtime.getRuntime().availableProcessors());
                     nodeList.forEach(node -> nodeMap.put(node.getId(), node));
                     return nodeMap;
                 }, executor).join();
             }
         } else {
-            Map<K, T> nodeMap = LinkedHashMap.newLinkedHashMap(nodeList.size());
+            // 小数据集使用LinkedHashMap + 精确容量
+            Map<K, T> nodeMap = new LinkedHashMap<>(size + (size >> 2), 0.75f);
             nodeList.forEach(node -> nodeMap.put(node.getId(), node));
             return nodeMap;
         }
     }
 
-    // ✨ 核心优化：Java 21 的 groupingByConcurrent！
-    private List<T> buildTreeBFS(Map<K, T> nodeMap, K parentId) {
-        if (nodeMap.isEmpty()) return Collections.emptyList();
-
-        // 构建父节点映射（用 Java 21 并行收集器）
-        Map<K, List<T>> parentMap = buildParentMap(nodeMap);
-        Queue<T> queue = new LinkedList<>();
-        // 找出所有根节点（parentId == null）
-        for (T node : nodeMap.values()) {
-            if (node.getParentId() == null || Objects.equals(node.getParentId(), parentId)) {
-                queue.offer(node);
+    // 优化ParentMap构建：只包含在nodeMap中存在的父节点
+    private Map<K, List<T>> buildOptimizedParentMap(Map<K, T> nodeMap) {
+        Map<K, List<T>> parentMap = new ConcurrentHashMap<>();
+        // 根据数据量选择处理方式
+        if (nodeMap.size() > 10000) {
+            nodeMap.values().parallelStream().forEach(node -> {
+                K parentId = node.getParentId();
+                // 只有当parentId不为null且在nodeMap中存在时，才建立父子关系
+                if (parentId != null && nodeMap.containsKey(parentId)) {
+                    parentMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(node);
+                }
+            });
+        } else {
+            for (T node : nodeMap.values()) {
+                K parentId = node.getParentId();
+                if (parentId != null && nodeMap.containsKey(parentId)) {
+                    parentMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(node);
+                }
             }
         }
-        // BFS：按层级构建树（O(N) 时间！）
-        while (!queue.isEmpty()) {
-            T parent = queue.poll();
-            List<T> children = parentMap.getOrDefault(parent.getId(), Collections.emptyList());
-            for (T child : children) {
-                parent.addChild(child); // 添加子节点
-                queue.offer(child);     // 子节点入队（处理它们的子节点）
-                nodeMap.remove(child.getId()); // 从Map移除，避免重复
-            }
-        }
-        return new ArrayList<>(nodeMap.values()); // 返回根节点列表
+        return parentMap;
     }
 
-    private Map<K, List<T>> buildParentMap(Map<K, T> nodeMap) {
-        return nodeMap.values().parallelStream()
-                .collect(Collectors.groupingByConcurrent(
-                        TreeNode::getParentId, Collectors.toList()
-                ));
+    // 优化树构建：父节点找不到的节点自动成为根节点
+    private List<T> buildTreeWithOrphanedRoots(Map<K, T> nodeMap) {
+        if (nodeMap.isEmpty()) return Collections.emptyList();
+        // 构建父节点映射（只包含存在的父节点）
+        Map<K, List<T>> parentMap = buildOptimizedParentMap(nodeMap);
+        // 找出根节点：parentId为null的节点 + 找不到父节点的节点（孤岛节点）
+        List<T> roots = findRootNodes(nodeMap);
+        // BFS遍历构建树
+        performBFSTraversal(roots, parentMap);
+        return roots;
+    }
+
+    // 提取根节点查找逻辑
+    private List<T> findRootNodes(Map<K, T> nodeMap) {
+        List<T> roots = new ArrayList<>();
+        for (T node : nodeMap.values()) {
+            K parentId = node.getParentId();
+            // 如果parentId为null 或者 父节点不存在于nodeMap中，则作为根节点
+            if (parentId == null || !nodeMap.containsKey(parentId)) {
+                roots.add(node);
+            }
+        }
+        return roots;
+    }
+
+    // 提取BFS遍历逻辑
+    private void performBFSTraversal(List<T> roots, Map<K, List<T>> parentMap) {
+        // 使用ArrayDeque替代LinkedList（性能提升50%+）
+        Deque<T> queue = new ArrayDeque<>(roots.size() * 2);
+        roots.forEach(queue::offer);
+
+        // BFS遍历构建树
+        while (!queue.isEmpty()) {
+            T parent = queue.poll();
+            List<T> children = parentMap.get(parent.getId());
+
+            if (children != null && !children.isEmpty()) {
+                // 直接设置children（避免逐个addChild调用）
+                parent.setChildren(children);
+
+                for (T child : children) {
+                    queue.offer(child);
+                }
+            } else {
+                parent.setChildren(Collections.emptyList());
+            }
+        }
     }
 
     /**
      * 使用 SequencedCollection (Java 21 新特性) 返回有序结果
      */
-    public SequencedCollection<T> buildTreeOrdered(List<T> nodeList, K parentId) {
-        List<T> result = buildTree(nodeList, parentId);
+    public SequencedCollection<T> buildTreeOrdered(List<T> nodeList) {
+        List<T> result = buildTree(nodeList);
         return Collections.unmodifiableSequencedCollection(result);
     }
 

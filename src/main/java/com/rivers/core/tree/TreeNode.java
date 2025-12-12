@@ -10,6 +10,8 @@ public interface TreeNode<K, T extends TreeNode<K, T>> {
 
     List<T> getChildren();
 
+    void setChildren(List<T> children);
+
     void addChild(T child);
 
 }
