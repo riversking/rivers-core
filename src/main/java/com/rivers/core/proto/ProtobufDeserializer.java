@@ -1,20 +1,20 @@
 package com.rivers.core.proto;
 
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.GeneratedMessage;
+import com.rivers.core.exception.BusinessException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ValueDeserializer;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Map.Entry;
 import java.util.Set;
 
 // 这是一个通用的Protobuf反序列化器
-public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeserializer<T> implements ContextualDeserializer {
+public class ProtobufDeserializer<T extends GeneratedMessage> extends ValueDeserializer<T> {
 
     private Class<T> targetType;
 
@@ -23,36 +23,18 @@ public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeseria
         // 调用父类 StdDeserializer 的构造器，传入一个占位类型
         // 因为这个“原型”实例本身不用于反序列化，所以传入什么类型并不重要
         // GeneratedMessageV3.class 是一个合理的占位符
-        super(GeneratedMessage.class);
+        super();
     }
 
 
     private ProtobufDeserializer(Class<T> targetType) {
-        super(targetType);
+        super();
         this.targetType = targetType;
     }
 
     @Override
-    public JsonDeserializer<?> createContextual(DeserializationContext dc, BeanProperty property) {
-        JavaType type = dc.getContextualType();
-        if (type == null) {
-            return this; // 返回原型实例本身（虽然不太可能发生）
-        }
-        Class<?> rawClass = type.getRawClass();
-        if (!GeneratedMessage.class.isAssignableFrom(rawClass)) {
-            // 如果不是Protobuf消息类型，可以返回null或抛出异常
-            // 让Jackson使用默认的反序列化器
-            return null;
-        }
-        // 使用带参构造器创建一个新的、专门针对 rawClass 的反序列化器实例
-        // @SuppressWarnings("unchecked")
-        return new ProtobufDeserializer<>((Class<T>) rawClass);
-    }
-
-
-    @Override
-    public T deserialize(JsonParser p, DeserializationContext deserializationContext) throws IOException {
-        JsonNode node = p.getCodec().readTree(p);
+    public T deserialize(JsonParser p, DeserializationContext deserializationContext) {
+        JsonNode node = p.readValueAsTree();
         // 通过反射调用消息类的 newBuilder() 方法来获取Builder实例
         try {
             Method newBuilderMethod = targetType.getMethod("newBuilder");
@@ -84,7 +66,7 @@ public class ProtobufDeserializer<T extends GeneratedMessage> extends StdDeseria
             // @SuppressWarnings("unchecked")
             return (T) builder.build();
         } catch (Exception e) {
-            throw new IOException("Failed to deserialize Protobuf message", e);
+            throw new BusinessException("Failed to deserialize Protobuf message", e);
         }
     }
 }

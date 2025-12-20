@@ -1,56 +1,34 @@
 package com.rivers.core.config;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.protobuf.GeneratedMessage;
-import com.google.protobuf.UnknownFieldSet;
 import com.google.protobuf.util.JsonFormat;
 import com.rivers.core.proto.ProtobufDeserializer;
 import com.rivers.core.proto.ProtobufSerializer;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.http.converter.protobuf.ProtobufJsonFormatHttpMessageConverter;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.module.SimpleModule;
 
-@Configuration(proxyBeanMethods = false)
+@Configuration
 public class ProtobufJacksonConfig {
 
-    @Configuration(proxyBeanMethods = false)
-    static class ObjectMapperBeanPostProcessor implements BeanPostProcessor {
-
-        @Override
-        public Object postProcessAfterInitialization(@NotNull Object bean, @NotNull String beanName)
-                throws BeansException {
-            // 1. 检查当前初始化的Bean是否是Jackson的ObjectMapper
-            if (bean instanceof ObjectMapper objectMapper) {
-                // 2. 对其进行定制化
-                // 注册我们的Protobuf模块
-                // 【关键】创建并注册 Module
-                SimpleModule protobufModule = new SimpleModule("ProtobufModule");
-
-                // 将我们的序列化器注册为处理所有 GeneratedMessageV3 子类的通用序列化器
-                // 注意：我们使用 new ProtobufSerializer()，它有一个无参构造函数
-                protobufModule.addSerializer(GeneratedMessage.class, new ProtobufSerializer<>());
-
-                // 将反序列化器也注册回来
-                protobufModule.addDeserializer(GeneratedMessage.class, new ProtobufDeserializer<>());
-                objectMapper.registerModule(protobufModule);
-                // 配置特性
-                objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,false)
-                        .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
-                        .configure(SerializationFeature.FAIL_ON_SELF_REFERENCES, false)
-                        .addMixIn(UnknownFieldSet.class, StdScalarSerializer.class);
-                // 3. 返回修改后的Bean
-                return objectMapper;
-            }
-            // 4. 如果不是ObjectMapper，则原样返回
-            return bean;
-        }
+    @Bean
+    public JsonMapperBuilderCustomizer jsonMapperBuilderCustomizer() {
+        return builder -> builder.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                .disable(SerializationFeature.FAIL_ON_SELF_REFERENCES)
+                .changeDefaultPropertyInclusion(incl ->
+                        incl.withValueInclusion(JsonInclude.Include.NON_NULL))
+                .addModule(new SimpleModule("ProtobufModule")
+                        .addSerializer(GeneratedMessage.class, new ProtobufSerializer<>())
+                        .addDeserializer(GeneratedMessage.class, new ProtobufDeserializer<>()))
+                .build();
     }
 
     @Bean
@@ -61,4 +39,10 @@ public class ProtobufJacksonConfig {
         return new ProtobufJsonFormatHttpMessageConverter(parser, printer);
     }
 
+    @Bean
+    public HttpMessageConverters httpMessageConverters() {
+        return HttpMessageConverters.forServer()
+                .addCustomConverter(protobufJsonFormatHttpMessageConverter())
+                .build();
+    }
 }

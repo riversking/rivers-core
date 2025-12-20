@@ -1,14 +1,15 @@
 package com.rivers.core.proto;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+
 import com.google.common.collect.Lists;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.GeneratedMessage;
 import com.rivers.core.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.ReflectionUtils;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ValueSerializer;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -17,7 +18,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
-public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializer<T> {
+public class ProtobufSerializer<T extends GeneratedMessage> extends ValueSerializer<T> {
 
     private static final List<String> usableFieldNames = Lists.newArrayList("total");
 
@@ -28,8 +29,9 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
     public ProtobufSerializer() {
     }
 
+
     @Override
-    public void serialize(T message, JsonGenerator gen, SerializerProvider provider) throws IOException {
+    public void serialize(T message, JsonGenerator gen, SerializationContext provider) {
         var descriptor = message.getDescriptorForType();
         var protoFieldNames = descriptor.getFields().stream()
                 .map(Descriptors.FieldDescriptor::getName)
@@ -41,11 +43,10 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
         gen.writeEndObject();
     }
 
-    private void processMethod(T message, JsonGenerator gen, SerializerProvider provider,
-                               Method method, Set<String> protoFieldNames) throws IOException {
+    private void processMethod(GeneratedMessage message, JsonGenerator gen, SerializationContext provider,
+                               Method method, Set<String> protoFieldNames) {
         var methodName = method.getName();
         var paramCount = method.getParameterCount();
-
         // 其他方法不做处理
         if (methodName.startsWith("get") && paramCount == 0 && !methodName.equals("getClass")) {
             String fieldName = extractFieldName(methodName);
@@ -60,13 +61,13 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
         }
     }
 
-    private void processGetterMethod(T message, JsonGenerator gen, SerializerProvider provider,
+    private void processGetterMethod(GeneratedMessage message, JsonGenerator gen, SerializationContext provider,
                                      Method method, String fieldName) {
         try {
             ReflectionUtils.makeAccessible(method);
             var value = method.invoke(message);
             if (shouldSerializeValue(value) || usableFieldNames.contains(fieldName)) {
-                gen.writeFieldName(fieldName);
+                gen.writeName(fieldName);
                 switch (value) {
                     case List<?> list -> serializeList(list, gen, provider);
                     case null -> {
@@ -81,8 +82,8 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
         }
     }
 
-    private void processHasMethod(T message, JsonGenerator gen, SerializerProvider provider,
-                                  Method method, String fieldName) throws IOException {
+    private void processHasMethod(GeneratedMessage message, JsonGenerator gen, SerializationContext provider,
+                                  Method method, String fieldName) {
         try {
             ReflectionUtils.makeAccessible(method);
             if (Boolean.TRUE.equals(method.invoke(message))) {
@@ -92,7 +93,7 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
                     ReflectionUtils.makeAccessible(getter);
                     var value = getter.invoke(message);
                     if (shouldSerializeValue(value)) {
-                        gen.writeFieldName(fieldName);
+                        gen.writeName(fieldName);
                         provider.findValueSerializer(value.getClass()).serialize(value, gen, provider);
                     }
                 }
@@ -103,18 +104,12 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends JsonSerializ
         }
     }
 
-    private void serializeList(List<?> list, JsonGenerator gen, SerializerProvider provider) throws IOException {
+    private void serializeList(List<?> list, JsonGenerator gen, SerializationContext provider) {
         gen.writeStartArray();
         try {
             list.stream()
                     .filter(this::shouldSerializeValue)
-                    .forEach(item -> {
-                        try {
-                            provider.findValueSerializer(item.getClass()).serialize(item, gen, provider);
-                        } catch (IOException e) {
-                            log.error("Failed to serialize list item", e);
-                        }
-                    });
+                    .forEach(item -> provider.findValueSerializer(item.getClass()).serialize(item, gen, provider));
         } finally {
             gen.writeEndArray();
         }
