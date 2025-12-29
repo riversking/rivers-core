@@ -14,6 +14,7 @@ import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,15 +26,22 @@ public class JwtUtil {
 
     private static final KeyPair keyPair;
 
+    private JwtUtil() {
+        throw new IllegalStateException("Utility class");
+    }
+
 
     static {
         signatureAlgorithm = Jwts.SIG.RS256;
         try (InputStream is = JwtUtil.class.getClassLoader().getResourceAsStream("key/rivers.jks")) {
             KeyStore keyStore = KeyStore.getInstance("JKS");
-            keyStore.load(is, JwtConstant.JWT_SECRET.toCharArray());
-            PrivateKey riversPrivate = (PrivateKey) keyStore.getKey("siyao", JwtConstant.JWT_SECRET.toCharArray());
+            String keyStorePassword = System.getenv("JWT_KEYSTORE_PASSWORD");
+            char[] password = keyStorePassword.toCharArray();
+            keyStore.load(is, password);
+            PrivateKey riversPrivate = (PrivateKey) keyStore.getKey("siyao", password);
             PublicKey riversPub = keyStore.getCertificate("siyao").getPublicKey();
             keyPair = new KeyPair(riversPub, riversPrivate);
+            Arrays.fill(password, '\0');
         } catch (Exception e) {
             throw new BusinessException(e);
         }

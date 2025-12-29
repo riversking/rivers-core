@@ -1,8 +1,7 @@
 package com.rivers.core.util;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rivers.core.exception.BusinessException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -99,13 +98,7 @@ public class HttpClientUtil {
      * @throws BusinessException 如果请求失败或序列化失败
      */
     public static <T> String postJson(String url, T body, Map<String, String> headers) {
-        String jsonBody;
-        try {
-            jsonBody = OBJECT_MAPPER.writeValueAsString(body);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException("Failed to serialize request body to JSON", e);
-        }
-
+        String jsonBody = OBJECT_MAPPER.writeValueAsString(body);
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Content-Type", "application/json")
@@ -114,7 +107,6 @@ public class HttpClientUtil {
         if (headers != null && !headers.isEmpty()) {
             headers.forEach(requestBuilder::header);
         }
-
         return sendRequest(DEFAULT_CLIENT, requestBuilder.build());
     }
 
