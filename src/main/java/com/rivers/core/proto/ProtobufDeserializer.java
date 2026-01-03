@@ -54,7 +54,7 @@ public class ProtobufDeserializer<T extends GeneratedMessage> extends ValueDeser
                 if (fieldDescriptor != null) {
                     // 根据字段类型设置值
                     if (fieldDescriptor.getType() == Descriptors.FieldDescriptor.Type.STRING) {
-                        builder.setField(fieldDescriptor, value.asText());
+                        builder.setField(fieldDescriptor, value.stringValue());
                     } else if (fieldDescriptor.getType() == Descriptors.FieldDescriptor.Type.INT32) {
                         builder.setField(fieldDescriptor, value.asInt());
                     } else if (fieldDescriptor.getType() == Descriptors.FieldDescriptor.Type.BOOL) {

@@ -6,11 +6,12 @@ import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.util.JsonFormat;
 import com.rivers.core.proto.ProtobufDeserializer;
 import com.rivers.core.proto.ProtobufSerializer;
+import org.springframework.boot.http.codec.CodecCustomizer;
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.converter.HttpMessageConverters;
-import org.springframework.http.converter.protobuf.ProtobufJsonFormatHttpMessageConverter;
+import org.springframework.http.codec.protobuf.ProtobufJsonDecoder;
+import org.springframework.http.codec.protobuf.ProtobufJsonEncoder;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.module.SimpleModule;
@@ -31,18 +32,19 @@ public class ProtobufJacksonConfig {
                 .build();
     }
 
-    @Bean
-    public ProtobufJsonFormatHttpMessageConverter protobufJsonFormatHttpMessageConverter() {
-        // 使用自定义的 JsonFormat.Parser
-        JsonFormat.Parser parser = JsonFormat.parser().ignoringUnknownFields();
-        JsonFormat.Printer printer = JsonFormat.printer();
-        return new ProtobufJsonFormatHttpMessageConverter(parser, printer);
-    }
 
     @Bean
-    public HttpMessageConverters httpMessageConverters() {
-        return HttpMessageConverters.forServer()
-                .addCustomConverter(protobufJsonFormatHttpMessageConverter())
-                .build();
+    public CodecCustomizer protobufCodecCustomizer() {
+        return configurer -> {
+            JsonFormat.Parser parser = JsonFormat.parser().ignoringUnknownFields();
+            JsonFormat.Printer printer = JsonFormat.printer();
+            // 注册到 customCodecs（优先级高于默认的 Jackson）
+            configurer.customCodecs().registerWithDefaultConfig(
+                    new ProtobufJsonDecoder(parser)
+            );
+            configurer.customCodecs().registerWithDefaultConfig(
+                    new ProtobufJsonEncoder(printer)
+            );
+        };
     }
 }
