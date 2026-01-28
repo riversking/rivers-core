@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -30,20 +31,20 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         int size = nodeList.size();
         if (size > 10000) {
             // 大数据集使用并行验证
-            ConcurrentHashMap.KeySetView<Object, Boolean> idSet = ConcurrentHashMap.newKeySet();
-            AtomicBoolean hasError = new AtomicBoolean(false);
-            StringBuilder errorMsg = new StringBuilder();
+            // 修复1: 使用线程安全集合收集错误
+            ConcurrentHashMap.KeySetView<K, Boolean> idSet = ConcurrentHashMap.newKeySet(); // 修复泛型
+            ConcurrentLinkedQueue<String> errors = new ConcurrentLinkedQueue<>();
             nodeList.parallelStream().forEach(node -> {
-                if (node.getId() == null) {
-                    hasError.set(true);
-                    errorMsg.append("Node ID cannot be null; ");
-                } else if (!idSet.add(node.getId())) {
-                    hasError.set(true);
-                    errorMsg.append("Duplicate node ID: ").append(node.getId()).append("; ");
+                K id = node.getId(); // 提前获取，避免多次调用
+                if (id == null) {
+                    errors.add("Node ID cannot be null");
+                } else if (!idSet.add(id)) {
+                    errors.add("Duplicate node ID: " + id);
                 }
             });
-            if (hasError.get()) {
-                throw new IllegalArgumentException(errorMsg.toString());
+            // 修复2: 安全合并错误信息
+            if (!errors.isEmpty()) {
+                throw new IllegalArgumentException(String.join("; ", errors));
             }
         } else {
             // 小数据集串行验证（避免并行开销）
@@ -81,22 +82,11 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
 
     // 优化ParentMap构建：只包含在nodeMap中存在的父节点
     private Map<K, List<T>> buildOptimizedParentMap(Map<K, T> nodeMap) {
-        Map<K, List<T>> parentMap = new ConcurrentHashMap<>();
-        // 根据数据量选择处理方式
-        if (nodeMap.size() > 10000) {
-            nodeMap.values().parallelStream().forEach(node -> {
-                K parentId = node.getParentId();
-                // 只有当parentId不为null且在nodeMap中存在时，才建立父子关系
-                if (parentId != null && nodeMap.containsKey(parentId)) {
-                    parentMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(node);
-                }
-            });
-        } else {
-            for (T node : nodeMap.values()) {
-                K parentId = node.getParentId();
-                if (parentId != null && nodeMap.containsKey(parentId)) {
-                    parentMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(node);
-                }
+        Map<K, List<T>> parentMap = new HashMap<>(nodeMap.size());
+        for (T node : nodeMap.values()) {
+            K parentId = node.getParentId();
+            if (parentId != null && nodeMap.containsKey(parentId)) {
+                parentMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(node);
             }
         }
         return parentMap;
@@ -137,11 +127,9 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         while (!queue.isEmpty()) {
             T parent = queue.poll();
             List<T> children = parentMap.get(parent.getId());
-
             if (children != null && !children.isEmpty()) {
                 // 直接设置children（避免逐个addChild调用）
                 parent.setChildren(children);
-
                 for (T child : children) {
                     queue.offer(child);
                 }
