@@ -1,6 +1,6 @@
 plugins {
     id 'java-library'
-    id 'org.springframework.boot' version '4.0.0'
+    id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
     id "com.vanniktech.maven.publish" version "0.30.0"
     id 'maven-publish'
@@ -50,8 +50,6 @@ repositories {
 
 ext {
     set('springCloudVersion', "2025.1.0")
-    set('springCloudNacosVersion', "2025.0.0.0-preview")
-    set('mybatisPlusVersion', "3.5.14")
 }
 
 dependencies {
@@ -65,7 +63,7 @@ dependencies {
     api 'cn.hutool:hutool-all:5.8.40'
     api 'org.projectlombok:lombok'
     api 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
-    api platform('com.alibaba.cloud:spring-cloud-alibaba-dependencies:2025.1.0.0-SNAPSHOT')
+    api platform('com.alibaba.cloud:spring-cloud-alibaba-dependencies:2025.1.0.0')
     api 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config'
     api 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
     api platform('com.baomidou:mybatis-plus-bom:3.5.15')
@@ -75,7 +73,6 @@ dependencies {
     api 'io.jsonwebtoken:jjwt-gson:0.13.0'
     api 'io.jsonwebtoken:jjwt-impl:0.13.0'
     api 'org.hashids:hashids:1.0.3'
-    api 'org.springframework:spring-web'
     api 'org.springframework.cloud:spring-cloud-bus'
     api 'com.google.protobuf:protobuf-java:4.33.2'
     api 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
@@ -108,7 +105,7 @@ tasks.withType(Javadoc).configureEach {
 
 mavenPublishing {
     // 配置坐标,参数一要和命名空间一致，参二为项目名(GroupId),参三为版本号 "1.0.0"
-    coordinates("io.github.riversking", "rivers-core", "1.0.19")
+    coordinates("io.github.riversking", "rivers-core", "1.0.20")
     // 配置 pom 文件信息
     pom {
         // 项目名
