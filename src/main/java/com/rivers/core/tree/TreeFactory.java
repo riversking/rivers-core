@@ -4,85 +4,55 @@ import org.apache.commons.collections4.CollectionUtils;
 
 import java.io.Serializable;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * 树构建工厂。
+ * <p>
+ * 全链路单线程实现：校验、建图、父子映射、BFS 均为 O(n) 纯内存操作。
+ * 40k 节点整体耗时应在几十毫秒内；并行流/虚拟线程对这类 CPU 密集且
+ * 无阻塞的小任务只会引入线程调度开销，反而拖慢构建。
+ */
 public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
 
     /**
-     * 使用虚拟线程处理大规模数据构建
+     * 构建森林：parentId 为 null 或父节点不存在的节点自动成为根节点。
      */
     public List<T> buildTree(List<T> nodeList) {
         if (CollectionUtils.isEmpty(nodeList)) {
             return Collections.emptyList();
         }
-        // 优化验证：大数据并行验证
-        validateNodeListOptimized(nodeList);
-        // 优化NodeMap创建
-        Map<K, T> nodeMap = createOptimizedNodeMap(nodeList);
-        // 优化树构建：父节点找不到自动成为根节点
+        // 一次遍历完成：ID 校验 + 节点建图（fail-fast）
+        Map<K, T> nodeMap = createNodeMap(nodeList);
+        // 建父子映射 + 找根 + BFS 组装
         return buildTreeWithOrphanedRoots(nodeMap);
     }
 
-    private void validateNodeListOptimized(List<T> nodeList) {
+    /**
+     * 单次遍历：校验 ID 非空且唯一，同时构建节点映射。
+     * 精确预分配容量避免扩容；LinkedHashMap 单线程写性能最优。
+     */
+    private Map<K, T> createNodeMap(List<T> nodeList) {
         int size = nodeList.size();
-        if (size > 10000) {
-            // 大数据集使用并行验证
-            // 修复1: 使用线程安全集合收集错误
-            ConcurrentHashMap.KeySetView<K, Boolean> idSet = ConcurrentHashMap.newKeySet(); // 修复泛型
-            ConcurrentLinkedQueue<String> errors = new ConcurrentLinkedQueue<>();
-            nodeList.parallelStream().forEach(node -> {
-                K id = node.getId(); // 提前获取，避免多次调用
-                if (id == null) {
-                    errors.add("Node ID cannot be null");
-                } else if (!idSet.add(id)) {
-                    errors.add("Duplicate node ID: " + id);
-                }
-            });
-            // 修复2: 安全合并错误信息
-            if (!errors.isEmpty()) {
-                throw new IllegalArgumentException(String.join("; ", errors));
+        Map<K, T> nodeMap = new LinkedHashMap<>(size + (size >> 2), 0.75f);
+        Set<K> seen = HashSet.newHashSet(size + (size >> 2));
+        for (T node : nodeList) {
+            K id = node.getId();
+            if (id == null) {
+                throw new IllegalArgumentException("Node ID cannot be null");
             }
-        } else {
-            // 小数据集串行验证（避免并行开销）
-            Set<K> ids = HashSet.newHashSet(size + (size >> 2));
-            for (T node : nodeList) {
-                if (node.getId() == null) {
-                    throw new IllegalArgumentException("Node ID cannot be null");
-                }
-                if (!ids.add(node.getId())) {
-                    throw new IllegalArgumentException("Duplicate node ID: " + node.getId());
-                }
+            if (!seen.add(id)) {
+                throw new IllegalArgumentException("Duplicate node ID: " + id);
             }
+            nodeMap.put(id, node);
         }
+        return nodeMap;
     }
 
-    private Map<K, T> createOptimizedNodeMap(List<T> nodeList) {
-        int size = nodeList.size();
-        if (size > 5000) {
-            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                return CompletableFuture.supplyAsync(() -> {
-                    // 使用ConcurrentHashMap + 精确容量预分配
-                    Map<K, T> nodeMap = new ConcurrentHashMap<>(size + (size >> 2), 0.75f,
-                            Runtime.getRuntime().availableProcessors());
-                    nodeList.forEach(node -> nodeMap.put(node.getId(), node));
-                    return nodeMap;
-                }, executor).join();
-            }
-        } else {
-            // 小数据集使用LinkedHashMap + 精确容量
-            Map<K, T> nodeMap = new LinkedHashMap<>(size + (size >> 2), 0.75f);
-            nodeList.forEach(node -> nodeMap.put(node.getId(), node));
-            return nodeMap;
-        }
-    }
-
-    // 优化ParentMap构建：只包含在nodeMap中存在的父节点
+    /**
+     * 构建父子映射：只包含父节点实际存在的子节点，孤岛节点不进映射。
+     */
     private Map<K, List<T>> buildOptimizedParentMap(Map<K, T> nodeMap) {
-        Map<K, List<T>> parentMap = new HashMap<>(nodeMap.size());
+        Map<K, List<T>> parentMap = HashMap.newHashMap(nodeMap.size());
         for (T node : nodeMap.values()) {
             K parentId = node.getParentId();
             if (parentId != null && nodeMap.containsKey(parentId)) {
@@ -92,24 +62,26 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         return parentMap;
     }
 
-    // 优化树构建：父节点找不到的节点自动成为根节点
+    /**
+     * 树构建：父节点缺失的节点（孤岛）自动提升为根节点。
+     */
     private List<T> buildTreeWithOrphanedRoots(Map<K, T> nodeMap) {
-        if (nodeMap.isEmpty()) return Collections.emptyList();
-        // 构建父节点映射（只包含存在的父节点）
+        if (nodeMap.isEmpty()) {
+            return Collections.emptyList();
+        }
         Map<K, List<T>> parentMap = buildOptimizedParentMap(nodeMap);
-        // 找出根节点：parentId为null的节点 + 找不到父节点的节点（孤岛节点）
         List<T> roots = findRootNodes(nodeMap);
-        // BFS遍历构建树
         performBFSTraversal(roots, parentMap);
         return roots;
     }
 
-    // 提取根节点查找逻辑
+    /**
+     * 根节点：parentId 为 null，或父节点不在当前数据集中。
+     */
     private List<T> findRootNodes(Map<K, T> nodeMap) {
         List<T> roots = new ArrayList<>();
         for (T node : nodeMap.values()) {
             K parentId = node.getParentId();
-            // 如果parentId为null 或者 父节点不存在于nodeMap中，则作为根节点
             if (parentId == null || !nodeMap.containsKey(parentId)) {
                 roots.add(node);
             }
@@ -117,22 +89,18 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         return roots;
     }
 
-    // 提取BFS遍历逻辑
+    /**
+     * BFS 组装：一次遍历设置每层 children。
+     */
     private void performBFSTraversal(List<T> roots, Map<K, List<T>> parentMap) {
-        // 使用ArrayDeque替代LinkedList（性能提升50%+）
-        Deque<T> queue = new ArrayDeque<>(roots.size() * 2);
+        Deque<T> queue = new ArrayDeque<>(Math.max(roots.size() * 2, 16));
         roots.forEach(queue::offer);
-
-        // BFS遍历构建树
         while (!queue.isEmpty()) {
             T parent = queue.poll();
             List<T> children = parentMap.get(parent.getId());
             if (children != null && !children.isEmpty()) {
-                // 直接设置children（避免逐个addChild调用）
                 parent.setChildren(children);
-                for (T child : children) {
-                    queue.offer(child);
-                }
+                children.forEach(queue::offer);
             } else {
                 parent.setChildren(Collections.emptyList());
             }
@@ -140,21 +108,22 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
     }
 
     /**
-     * 使用 SequencedCollection (Java 21 新特性) 返回有序结果
+     * 返回有序（只读）结果。
      */
     public SequencedCollection<T> buildTreeOrdered(List<T> nodeList) {
         List<T> result = buildTree(nodeList);
         return Collections.unmodifiableSequencedCollection(result);
     }
 
+    /**
+     * 构建「子 → 父」映射（节点在数据集中且父节点存在时）。
+     */
     public SequencedMap<K, T> buildParentMap(List<T> nodeList) {
         SequencedMap<K, T> parentMap = new LinkedHashMap<>();
         SequencedMap<K, T> nodeMap = new LinkedHashMap<>();
-        // 构建节点映射
         for (T node : nodeList) {
             nodeMap.put(node.getId(), node);
         }
-        // 建立父子关系
         for (T node : nodeList) {
             K parentId = node.getParentId();
             if (parentId != null) {
@@ -167,45 +136,38 @@ public class TreeFactory<K, T extends TreeNode<K, T>> implements Serializable {
         return parentMap;
     }
 
-
-    // 获取从指定子节点到根节点的所有父节点路径
-    // 获取从指定子节点到根节点的所有父节点路径
+    /**
+     * 获取从指定子节点到根节点的所有父节点路径（从根到子顺序）。
+     */
     public SequencedCollection<T> findPathToRoot(K childId, SequencedMap<K, T> parentMap) {
         List<T> path = new ArrayList<>();
         T current = parentMap.get(childId);
-        // 向上追溯到根节点
         while (current != null) {
-            path.addFirst(current); // 插入到开头保持从根到子的顺序
+            path.addFirst(current);
             current = parentMap.get(current.getId());
         }
         return Collections.unmodifiableSequencedCollection(path);
     }
 
-
-    // 构建从根节点到指定子节点的完整树形路径
+    /**
+     * 构建从根节点到指定子节点的完整树形路径。
+     */
     public SequencedCollection<T> buildPathTree(K childId, List<T> nodeList) {
-        // 构建父子关系映射
         SequencedMap<K, T> parentMap = buildParentMap(nodeList);
-        // 获取路径上的所有节点
         SequencedCollection<T> pathNodes = findPathToRoot(childId, parentMap);
-        // 如果找不到路径，返回空列表
         if (pathNodes.isEmpty()) {
             return Collections.unmodifiableSequencedCollection(new ArrayList<>());
         }
-        // 构建树形结构
         List<T> tree = new ArrayList<>();
-        T rootNode = pathNodes instanceof List<?> pathList ? (T) pathList.getFirst() : pathNodes.getFirst();
+        T rootNode = pathNodes.getFirst();
         tree.add(rootNode);
-        // 重建父子关系
         List<T> pathList = new ArrayList<>(pathNodes);
         for (int i = 1; i < pathList.size(); i++) {
             T parent = pathList.get(i - 1);
             T child = pathList.get(i);
-            parent.getChildren().clear(); // 清空原有子节点
+            parent.getChildren().clear();
             parent.addChild(child);
         }
         return Collections.unmodifiableSequencedCollection(tree);
     }
-
-
 }

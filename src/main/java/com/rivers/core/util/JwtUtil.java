@@ -5,6 +5,7 @@ import com.rivers.core.constant.JwtConstant;
 import com.rivers.core.entity.LoginUser;
 import com.rivers.core.exception.BusinessException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
