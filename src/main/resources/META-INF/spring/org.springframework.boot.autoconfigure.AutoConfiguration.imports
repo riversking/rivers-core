@@ -1,10 +1,5 @@
-com.rivers.core.config.ProtobufJacksonConfig
 com.rivers.core.config.FilterIgnorePropertiesConfig
-com.rivers.core.config.WebClientConfig
-com.rivers.core.client.DynamicServiceClient
-com.rivers.core.feign.DynamicClient
-com.rivers.core.feign.DynamicFeignClientFactory
-com.rivers.core.provider.ApplicationContextProvider
-com.rivers.core.util.SpringContextUtil
+com.rivers.core.config.ProtobufJacksonConfig
 com.rivers.core.config.RetryConfiguration
-com.rivers.core.task.BatchController
+com.rivers.core.config.RiversCoreAutoConfiguration
+com.rivers.core.config.WebClientConfig

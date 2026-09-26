@@ -1,8 +1,10 @@
 package com.rivers.core.config;
 
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,7 +15,8 @@ import org.springframework.web.reactive.function.client.support.WebClientAdapter
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 import reactor.core.publisher.Mono;
 
-@Configuration
+@AutoConfiguration
+@ConditionalOnClass(WebClient.class)
 public class WebClientConfig {
 
     @Bean
@@ -51,6 +54,7 @@ public class WebClientConfig {
      * 使用 WebClient 创建 HttpServiceProxyFactory
      */
     @Bean
+    @ConditionalOnMissingBean
     public HttpServiceProxyFactory httpServiceProxyFactory(WebClient.Builder webClientBuilder) {
         WebClient webClient = webClientBuilder.build();
         return HttpServiceProxyFactory.builderFor(WebClientAdapter.create(webClient)).build();

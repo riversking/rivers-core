@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * 批任务执行入口：接收调度端（timer-batch）派发的任务，异步执行本服务注册的 BatchTaskHandler。
+ * 由 {@link com.rivers.core.config.RiversCoreAutoConfiguration} 统一装配，
+ * 非任务执行节点的服务可通过 {@code rivers.batch.executor.enabled=false} 关闭本端点。
+ */
 @RestController
 @RequestMapping("job")
 @Slf4j

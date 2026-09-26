@@ -4,19 +4,19 @@ package com.rivers.core.config;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.util.JsonFormat;
-import com.rivers.core.proto.ProtobufDeserializer;
-import com.rivers.core.proto.ProtobufSerializer;
+import com.rivers.core.proto.ProtobufModule;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.http.codec.CodecCustomizer;
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.codec.protobuf.ProtobufJsonDecoder;
 import org.springframework.http.codec.protobuf.ProtobufJsonEncoder;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.SerializationFeature;
-import tools.jackson.databind.module.SimpleModule;
 
-@Configuration
+@AutoConfiguration
+@ConditionalOnClass(GeneratedMessage.class)
 public class ProtobufJacksonConfig {
 
     @Bean
@@ -26,10 +26,7 @@ public class ProtobufJacksonConfig {
                 .disable(SerializationFeature.FAIL_ON_SELF_REFERENCES)
                 .changeDefaultPropertyInclusion(incl ->
                         incl.withValueInclusion(JsonInclude.Include.NON_NULL))
-                .addModule(new SimpleModule("ProtobufModule")
-                        .addSerializer(GeneratedMessage.class, new ProtobufSerializer<>())
-                        .addDeserializer(GeneratedMessage.class, new ProtobufDeserializer<>()))
-                .build();
+                .addModule(new ProtobufModule());
     }
 
 

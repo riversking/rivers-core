@@ -1,8 +1,9 @@
 package com.rivers.core.feign;
 
-import org.springframework.stereotype.Component;
-
-@Component
+/**
+ * 动态 Feign 客户端：按服务名动态构建并执行调用。
+ * 由 {@link com.rivers.core.config.RiversCoreAutoConfiguration} 统一装配。
+ */
 public class DynamicClient {
 
     private final DynamicFeignClientFactory<DynamicFeign> dynamicFeignClientFactory;

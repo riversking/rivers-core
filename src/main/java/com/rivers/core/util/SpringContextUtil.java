@@ -2,11 +2,12 @@ package com.rivers.core.util;
 
 import com.rivers.core.provider.ApplicationContextProvider;
 import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-@Component
+/**
+ * 静态 Bean 获取工具：由 {@link com.rivers.core.config.RiversCoreAutoConfiguration} 统一装配。
+ */
 public class SpringContextUtil {
 
     public static  <T> T getBean(String bean,Class<T> clazz) {

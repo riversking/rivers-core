@@ -2,9 +2,10 @@ package com.rivers.core.feign;
 
 import org.springframework.cloud.openfeign.FeignClientBuilder;
 import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Component;
 
-@Component
+/**
+ * 动态 Feign 客户端工厂：由 {@link com.rivers.core.config.RiversCoreAutoConfiguration} 统一装配。
+ */
 public class DynamicFeignClientFactory<T> {
 
     private final FeignClientBuilder feignClientBuilder;

@@ -1,18 +1,22 @@
 package com.rivers.core.config;
 
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 
-@Configuration
+@AutoConfiguration
+@ConditionalOnClass(RetryTemplate.class)
 @EnableRetry
 public class RetryConfiguration {
 
 
     @Bean
+    @ConditionalOnMissingBean(name = "batchRetryTemplate")
     public RetryTemplate batchRetryTemplate() {
         RetryTemplate template = new RetryTemplate();
         // 设置重试策略

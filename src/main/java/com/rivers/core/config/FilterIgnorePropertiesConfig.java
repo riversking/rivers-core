@@ -2,19 +2,17 @@ package com.rivers.core.config;
 
 import com.google.common.collect.Lists;
 import lombok.Data;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
-import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
 /**
  * @author riversking
  */
-@Configuration
+@AutoConfiguration
 @RefreshScope
-@ConditionalOnExpression("!'${ignore}'.isEmpty()")
 @ConfigurationProperties(prefix = "ignore")
 @Data
 public class FilterIgnorePropertiesConfig {

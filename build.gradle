@@ -11,7 +11,7 @@ plugins {
 import com.vanniktech.maven.publish.SonatypeHost
 
 group = 'io.github.riversking'
-version = '1.0.25'
+version = '1.0.27'
 
 java {
     toolchain {
@@ -73,7 +73,6 @@ dependencies {
     api 'io.jsonwebtoken:jjwt-gson:0.13.0'
     api 'io.jsonwebtoken:jjwt-impl:0.13.0'
     api 'org.hashids:hashids:1.0.3'
-    api 'org.springframework.cloud:spring-cloud-bus'
     api 'com.google.protobuf:protobuf-java:4.33.2'
     api 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
     api 'com.google.protobuf:protobuf-java-util:4.33.2'
@@ -105,7 +104,7 @@ tasks.withType(Javadoc).configureEach {
 
 mavenPublishing {
     // 配置坐标,参数一要和命名空间一致，参二为项目名(GroupId),参三为版本号 "1.0.0"
-    coordinates("io.github.riversking", "rivers-core", "1.0.25")
+    coordinates("io.github.riversking", "rivers-core", "1.0.27")
     // 配置 pom 文件信息
     pom {
         // 项目名
