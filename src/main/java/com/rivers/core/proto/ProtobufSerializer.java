@@ -50,7 +50,8 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends ValueSeriali
         // 其他方法不做处理
         if (methodName.startsWith("get") && paramCount == 0 && !methodName.equals("getClass")) {
             String fieldName = extractFieldName(methodName);
-            if (protoFieldNames.contains(fieldName)) {
+            // 带 has 方法的字段（单 message 字段）交由 has 路径序列化，避免重复写入
+            if (protoFieldNames.contains(fieldName) && !hasHasMethod(message, fieldName)) {
                 processGetterMethod(message, gen, provider, method, fieldName);
             }
         } else if (methodName.startsWith("has") && paramCount == 0) {
@@ -123,6 +124,11 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends ValueSeriali
             case Boolean b when !b -> false;
             default -> true;
         };
+    }
+
+    private boolean hasHasMethod(GeneratedMessage message, String fieldName) {
+        String cap = fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+        return ReflectionUtils.findMethod(message.getClass(), "has" + cap) != null;
     }
 
     private String extractFieldName(String methodName) {

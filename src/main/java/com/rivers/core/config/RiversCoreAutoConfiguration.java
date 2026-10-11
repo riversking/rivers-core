@@ -1,22 +1,27 @@
 package com.rivers.core.config;
 
 import com.rivers.core.client.DynamicServiceClient;
+import com.rivers.core.client.RestClientUtil;
+import com.rivers.core.client.WebClientUtil;
 import com.rivers.core.feign.DynamicClient;
 import com.rivers.core.feign.DynamicFeign;
 import com.rivers.core.feign.DynamicFeignClientFactory;
 import com.rivers.core.provider.ApplicationContextProvider;
 import com.rivers.core.task.BatchController;
 import com.rivers.core.util.SpringContextUtil;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.cloud.openfeign.FeignClientBuilder;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -49,6 +54,35 @@ public class RiversCoreAutoConfiguration {
         @ConditionalOnMissingBean
         DynamicServiceClient dynamicServiceClient(WebClient.Builder webClientBuilder, DiscoveryClient discoveryClient) {
             return new DynamicServiceClient(webClientBuilder, discoveryClient);
+        }
+    }
+
+    /**
+     * RestClient 通用调用工具：服务间（服务名走服务发现）与外部 URL 直连双场景。
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass({RestClient.class, LoadBalanced.class})
+    static class RestClientUtilConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        RestClientUtil restClientUtil(@LoadBalanced RestClient.Builder restClientBuilder,
+                                      @Qualifier("externalRestClient") RestClient externalRestClient) {
+            return new RestClientUtil(restClientBuilder.build(), externalRestClient);
+        }
+    }
+
+    /**
+     * WebClient 通用调用工具：外部 URL 直连（响应式）。
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(WebClient.class)
+    static class WebClientUtilConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        WebClientUtil webClientUtil(@Qualifier("externalWebClient") WebClient externalWebClient) {
+            return new WebClientUtil(externalWebClient);
         }
     }
 
