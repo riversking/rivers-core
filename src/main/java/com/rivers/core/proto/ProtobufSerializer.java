@@ -45,6 +45,11 @@ public class ProtobufSerializer<T extends GeneratedMessage> extends ValueSeriali
 
     private void processMethod(GeneratedMessage message, JsonGenerator gen, SerializationContext provider,
                                Method method, Set<String> protoFieldNames) {
+        // repeated 字段的协变返回 bridge 方法（如 getImagesList 同时存在
+        // ProtocolStringList 与 List 两个返回值）与真实方法同名字，双写会导致 JSON 键重复
+        if (method.isBridge()) {
+            return;
+        }
         var methodName = method.getName();
         var paramCount = method.getParameterCount();
         // 其他方法不做处理
